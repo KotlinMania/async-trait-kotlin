@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "async-trait-kotlin"
+
