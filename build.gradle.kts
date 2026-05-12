@@ -349,20 +349,31 @@ val codeqlCompileJvm = tasks.register<JavaExec>("codeqlCompileJvm") {
 
     val outDir = layout.buildDirectory.dir("classes/kotlin/codeql-jvm")
     val sources = fileTree("src/commonMain/kotlin") { include("**/*.kt") }
+    val emptySourcePackage = "io.github.kotlinmania.asynctrait"
+    val emptySourceSentinel = layout.buildDirectory.file("generated/codeql-empty/CodeqlEmptySourceSentinel.kt")
     inputs.files(sources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(codeqlSourceClasspath).withNormalizer(ClasspathNormalizer::class.java)
     outputs.dir(outDir)
-
-    // Skip when commonMain has no Kotlin source. kotlinc 2.3.21 with an
-    // empty source-file list drops into REPL mode and fails with
-    // "Kotlin REPL is deprecated and should be enabled explicitly for now".
-    // For a port that hasn't started yet (.gitkeep only under commonMain),
-    // a skipped CodeQL extraction is the correct outcome — there is
-    // genuinely no Kotlin to analyse.
-    onlyIf("commonMain has at least one Kotlin source") { sources.files.isNotEmpty() }
+    outputs.file(emptySourceSentinel)
 
     doFirst {
         outDir.get().asFile.mkdirs()
+        val sourceFiles =
+            if (sources.files.isEmpty()) {
+                val sentinel = emptySourceSentinel.get().asFile
+                sentinel.parentFile.mkdirs()
+                sentinel.writeText(
+                    """
+                    package $emptySourcePackage
+
+                    internal object CodeqlEmptySourceSentinel
+                    """.trimIndent() + "\n",
+                )
+                listOf(sentinel)
+            } else {
+                sources.files.toList()
+            }
+
         args = listOf(
             "-d", outDir.get().asFile.absolutePath,
             "-classpath", codeqlSourceClasspath.asPath,
@@ -374,7 +385,7 @@ val codeqlCompileJvm = tasks.register<JavaExec>("codeqlCompileJvm") {
             "-opt-in", "kotlin.time.ExperimentalTime",
             "-opt-in", "kotlin.concurrent.atomics.ExperimentalAtomicApi",
             "-Xexpect-actual-classes",
-        ) + sources.files.map { it.absolutePath }
+        ) + sourceFiles.map { it.absolutePath }
     }
 }
 
