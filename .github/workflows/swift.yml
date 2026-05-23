@@ -9,7 +9,16 @@ permissions:
 jobs:
   build:
     name: Build and Test (Swift)
-    runs-on: macos-latest
+    # The Kotlin/Native 2.3.x distribution ships prebuilt platform caches
+    # (liborg.jetbrains.kotlin.native.platform.{CoreFoundation,Foundation,darwin}-cache.a)
+    # that reference macOS 26 / iOS 26 SDK symbols — NSCalendarIdentifierVikram,
+    # NSURLUbiquitousItemSupportedSyncControlsKey, mach_vm_reclaim_update_kernel_accounting_trap,
+    # xpc_session_set_peer_requirement, etc. macos-latest currently resolves to
+    # macos-15 (Xcode 16 SDK) and `swift test` link fails with "Undefined symbols
+    # for architecture arm64" on every one of those. Pin macos-26 so the SDK in
+    # /Applications/Xcode_26.x.app/Contents/Developer/Platforms provides the
+    # symbol stubs the cache expects.
+    runs-on: macos-26
     permissions:
       contents: read
     steps:
@@ -26,6 +35,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.1.0
 
       - name: Print Swift / Xcode versions
+        # NOTE: do NOT add a `maxim-lobanov/setup-xcode` step here.
+        # KotlinMania's enterprise GitHub Actions policy does not whitelist
+        # third-party actions; a workflow that references one returns
+        # startup_failure with zero jobs spawned. The macos-26 image's default
+        # Xcode is already in the 26.x line (currently 26.4.1) and supplies the
+        # macOS 26 SDK symbols the Kotlin/Native 2.3.x platform caches expect.
+        # A working run prints "Target: arm64-apple-macosx26.0" from
+        # `swift --version` straight off the image default.
         run: |
           swift --version
           xcodebuild -version
