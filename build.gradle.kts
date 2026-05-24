@@ -196,7 +196,11 @@ kotlin {
         binaries.framework { baseName = "AsyncTrait"; xcf.add(this) }
     }
     iosArm64 {
-        binaries.framework { baseName = "AsyncTrait"; xcf.add(this) }
+        binaries.framework {
+            baseName = "AsyncTrait"
+            isStatic = true
+            xcf.add(this)
+        }
     }
     iosSimulatorArm64 {
         binaries.framework {
@@ -206,10 +210,8 @@ kotlin {
         }
     }
     iosX64 {
-        // iOS Simulator targets share an XCFramework "fat" stage that
-        // requires every input framework to be either all static or all
-        // dynamic. iosSimulatorArm64 is already declared static for the
-        // Swift Export SPM bridge, so iosX64 must match.
+        // iOS targets share XCFramework fat stages that require every input
+        // framework to be either all static or all dynamic.
         binaries.framework {
             baseName = "AsyncTrait"
             isStatic = true
