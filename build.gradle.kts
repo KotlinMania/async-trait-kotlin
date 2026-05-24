@@ -196,13 +196,27 @@ kotlin {
         binaries.framework { baseName = "AsyncTrait"; xcf.add(this) }
     }
     iosArm64 {
-        binaries.framework { baseName = "AsyncTrait"; xcf.add(this) }
+        binaries.framework {
+            baseName = "AsyncTrait"
+            isStatic = true
+            xcf.add(this)
+        }
     }
     iosSimulatorArm64 {
-        binaries.framework { baseName = "AsyncTrait"; xcf.add(this) }
+        binaries.framework {
+            baseName = "AsyncTrait"
+            isStatic = true
+            xcf.add(this)
+        }
     }
     iosX64 {
-        binaries.framework { baseName = "AsyncTrait"; xcf.add(this) }
+        // iOS targets share XCFramework fat stages that require every input
+        // framework to be either all static or all dynamic.
+        binaries.framework {
+            baseName = "AsyncTrait"
+            isStatic = true
+            xcf.add(this)
+        }
     }
 
     tvosArm64 {

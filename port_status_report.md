@@ -1,6 +1,6 @@
 # Code Port - Progress Report
 
-**Generated:** 2026-05-20
+**Generated:** 2026-05-24
 **Source:** tmp/async-trait/src
 **Target:** src/commonMain/kotlin/io/github/kotlinmania/asynctrait
 
