@@ -289,7 +289,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.4.0")
                 api("io.github.kotlinmania:proc-macro2-kotlin:0.1.2")
                 api("io.github.kotlinmania:quote-kotlin:0.1.2")
-                api("io.github.kotlinmania:syn-kotlin:0.1.0")
+                api("io.github.kotlinmania:syn-kotlin:0.1.1")
             }
         }
         val commonTest by getting {
@@ -449,10 +449,10 @@ dependencies {
     codeqlSourceClasspath("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:0.4.0")
     codeqlSourceClasspath("io.github.kotlinmania:proc-macro2-kotlin-jvm:0.1.2")
     codeqlSourceClasspath("io.github.kotlinmania:quote-kotlin-jvm:0.1.2")
-    codeqlSourceClasspath("io.github.kotlinmania:syn-kotlin-jvm:0.1.0")
+    codeqlSourceClasspath("io.github.kotlinmania:syn-kotlin-jvm:0.1.1")
     codeqlAndroidAar("io.github.kotlinmania:proc-macro2-kotlin-android:0.1.2")
     codeqlAndroidAar("io.github.kotlinmania:quote-kotlin-android:0.1.2")
-    codeqlAndroidAar("io.github.kotlinmania:syn-kotlin-android:0.1.0")
+    codeqlAndroidAar("io.github.kotlinmania:syn-kotlin-android:0.1.1")
 }
 
 val codeqlCompileJvm = tasks.register<JavaExec>("codeqlCompileJvm") {
