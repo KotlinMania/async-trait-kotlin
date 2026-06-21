@@ -15,7 +15,8 @@ typealias Supertraits = Punctuated<TypeParamBound, Plus>
 
 enum class InferredBound : ToTokens {
     Send,
-    Sync;
+    Sync,
+    ;
 
     internal fun asStr(): String =
         when (this) {
@@ -44,9 +45,9 @@ fun hasBound(supertraits: Supertraits, bound: InferredBound): Boolean {
             if (
                 path.isIdent(bound.asStr()) ||
                 path.segments.len() == 3 &&
-                    (path.segments[0].ident.toString() == "std" || path.segments[0].ident.toString() == "core") &&
-                    path.segments[1].ident.toString() == "marker" &&
-                    path.segments[2].ident.toString() == bound.asStr()
+                (path.segments[0].ident.toString() == "std" || path.segments[0].ident.toString() == "core") &&
+                path.segments[1].ident.toString() == "marker" &&
+                path.segments[2].ident.toString() == bound.asStr()
             ) {
                 return true
             }
