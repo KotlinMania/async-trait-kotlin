@@ -6,8 +6,9 @@ import io.github.kotlinmania.procmacro2.Span
 import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.syn.Path
 import io.github.kotlinmania.syn.PathSegment
-import io.github.kotlinmania.syn.Punctuated
+import io.github.kotlinmania.syn.PathSegmentList
 import io.github.kotlinmania.syn.TypeParamBound
+import io.github.kotlinmania.syn.TypeParamBoundList
 import io.github.kotlinmania.syn.token.PathSep
 import io.github.kotlinmania.syn.token.Plus
 import kotlin.test.Test
@@ -45,7 +46,7 @@ class BoundTest {
 }
 
 private fun supertraits(vararg paths: Path): Supertraits {
-    val supertraits = Punctuated.new<TypeParamBound, Plus>()
+    val supertraits = TypeParamBoundList()
     for (path in paths) {
         if (!supertraits.emptyOrTrailing()) {
             supertraits.pushPunct(Plus.default())
@@ -59,7 +60,7 @@ private fun simplePath(name: String): Path =
     Path.from(Ident.new(name, Span.callSite()))
 
 private fun qualifiedPath(vararg names: String): Path {
-    val segments = Punctuated.new<PathSegment, PathSep>()
+    val segments = PathSegmentList()
     for (name in names) {
         if (!segments.emptyOrTrailing()) {
             segments.pushPunct(PathSep.default())
