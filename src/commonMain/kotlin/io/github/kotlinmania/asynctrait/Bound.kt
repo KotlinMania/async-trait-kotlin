@@ -6,12 +6,12 @@ import io.github.kotlinmania.procmacro2.Span
 import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.quote.ToTokens
 import io.github.kotlinmania.quote.toTokens
-import io.github.kotlinmania.syn.Punctuated
 import io.github.kotlinmania.syn.TypeParamBound
+import io.github.kotlinmania.syn.TypeParamBoundList
 import io.github.kotlinmania.syn.token.PathSep
 import io.github.kotlinmania.syn.token.Plus
 
-typealias Supertraits = Punctuated<TypeParamBound, Plus>
+typealias Supertraits = TypeParamBoundList
 
 enum class InferredBound : ToTokens {
     Send,
