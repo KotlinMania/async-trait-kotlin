@@ -8,6 +8,9 @@ androidKmp = "9.3.1"
 detekt = "1.23.8"
 ktlint = "14.2.0"
 kotlinxBenchmark = "0.4.17"
+synKotlin = "0.3.10"
+procMacro2 = "0.1.6"
+quote = "0.2.5"
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -25,12 +28,18 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "collectionsImmutable" }
 kotlinx-benchmark-runtime = { module = "org.jetbrains.kotlinx:kotlinx-benchmark-runtime", version.ref = "kotlinxBenchmark" }
+syn-kotlin = { module = "io.github.kotlinmania:syn-kotlin", version.ref = "synKotlin" }
+proc-macro2-kotlin = { module = "io.github.kotlinmania:proc-macro2-kotlin", version.ref = "procMacro2" }
+quote-kotlin = { module = "io.github.kotlinmania:quote-kotlin", version.ref = "quote" }
 
 [bundles]
-asynctrait-commonMain = [
+async-trait-commonMain = [
   "kotlinx-coroutines-core",
   "kotlinx-serialization-core",
   "kotlinx-serialization-json",
   "kotlinx-datetime",
   "collections-immutable",
+  "syn-kotlin",
+  "proc-macro2-kotlin",
+  "quote-kotlin",
 ]

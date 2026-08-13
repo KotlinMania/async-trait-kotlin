@@ -7,6 +7,7 @@ import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.syn.Path
 import io.github.kotlinmania.syn.PathSegment
 import io.github.kotlinmania.syn.PathSegmentList
+import io.github.kotlinmania.syn.TraitBoundModifier
 import io.github.kotlinmania.syn.TypeParamBound
 import io.github.kotlinmania.syn.TypeParamBoundList
 import io.github.kotlinmania.syn.token.PathSep
@@ -51,7 +52,7 @@ private fun supertraits(vararg paths: Path): Supertraits {
         if (!supertraits.emptyOrTrailing()) {
             supertraits.pushPunct(Plus.default())
         }
-        supertraits.pushValue(TypeParamBound.Trait(path))
+        supertraits.pushValue(TypeParamBound.Trait(null, TraitBoundModifier.None, null, path))
     }
     return supertraits
 }
