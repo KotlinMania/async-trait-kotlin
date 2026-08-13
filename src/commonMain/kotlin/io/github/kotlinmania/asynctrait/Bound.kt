@@ -9,7 +9,6 @@ import io.github.kotlinmania.quote.toTokens
 import io.github.kotlinmania.syn.TypeParamBound
 import io.github.kotlinmania.syn.TypeParamBoundList
 import io.github.kotlinmania.syn.token.PathSep
-import io.github.kotlinmania.syn.token.Plus
 
 typealias Supertraits = TypeParamBoundList
 

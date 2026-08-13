@@ -2,10 +2,12 @@
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.Span
-import io.github.kotlinmania.syn.Parse
 import io.github.kotlinmania.syn.ParseStream
+import io.github.kotlinmania.syn.QuestionParse
+import io.github.kotlinmania.syn.QuestionPeek
 import io.github.kotlinmania.syn.SynError
 import io.github.kotlinmania.syn.SynResult
+import io.github.kotlinmania.syn.customKeyword
 
 /**
  * Parsed arguments to the `#[async_trait]` attribute macro.
@@ -27,36 +29,29 @@ data class Args(
  * Parses the attribute argument list, accepting either an empty input
  * or exactly `?Send`.
  */
-internal object ArgsParse : Parse<Args> {
-    override fun parse(input: ParseStream): SynResult<Args> {
-        val result = tryParse(input)
-        if (result is SynResult.Success<Args> && input.isEmpty()) {
-            return result
-        }
-        return SynResult.failure(error())
+fun parseArgs(input: ParseStream): SynResult<Args> {
+    val result = tryParse(input)
+    if (result is SynResult.Success<Args> && input.isEmpty()) {
+        return result
     }
+    return SynResult.failure(error())
 }
 
-private fun tryParse(input: ParseStream): SynResult<Args> =
-    input.call { stream ->
-        val cursor = stream.cursor()
-        val punctPair = cursor.punct()
-
-        if (punctPair != null) {
-            val (punct, afterQuestion) = punctPair
-            if (punct.asChar() == '?') {
-                val identPair = afterQuestion.ident()
-                if (identPair != null) {
-                    val (ident, _) = identPair
-                    if (ident.toString() == "Send") {
-                        return@call SynResult.success(Args(local = true))
-                    }
-                }
-            }
-        }
-
-        SynResult.success(Args(local = false))
+private fun tryParse(input: ParseStream): SynResult<Args> {
+    if (!input.peek(QuestionPeek)) {
+        return SynResult.success(Args(local = false))
     }
+    val questionResult = QuestionParse.parse(input)
+    if (questionResult is SynResult.Failure) {
+        return SynResult.success(Args(local = false))
+    }
+    val (_, sendParse) = customKeyword("Send")
+    val sendResult = sendParse.parse(input)
+    if (sendResult is SynResult.Failure) {
+        return SynResult.success(Args(local = false))
+    }
+    return SynResult.success(Args(local = true))
+}
 
 private fun error(): SynError =
     SynError.new(
