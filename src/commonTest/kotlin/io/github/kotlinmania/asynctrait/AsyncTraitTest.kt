@@ -171,4 +171,69 @@ class AsyncTraitTest {
         val result = asyncTrait(args, input)
         assertTrue(result.isFailure, "Expected failure on invalid args")
     }
+
+    @Test
+    fun expandsGenericMethodInTrait() {
+        val input =
+            quote(
+                """
+                pub trait Issue1 {
+                    async fn f<U>(&self);
+                }
+                """.trimIndent(),
+            )
+        val output = asyncTraitOrThrow(TokenStream.new(), input)
+        val rendered = output.toString()
+        assertTrue("Pin" in rendered, "Expected Pin in signature: $rendered")
+    }
+
+    @Test
+    fun expandsGenericMethodInImpl() {
+        val input =
+            quote(
+                """
+                impl<T: Sync> Issue1 for Vec<T> {
+                    async fn f<U>(&self) {}
+                }
+                """.trimIndent(),
+            )
+        val output = asyncTraitOrThrow(TokenStream.new(), input)
+        val rendered = output.toString()
+        assertTrue("Box :: pin" in rendered || "Box::pin" in rendered, "Expected Box::pin in impl: $rendered")
+        assertTrue("async move" in rendered, "Expected async move in impl: $rendered")
+    }
+
+    @Test
+    fun expandsUnimplementedDefaultMethod() {
+        val input =
+            quote(
+                """
+                pub trait Trait {
+                    async fn f() {
+                        unimplemented!()
+                    }
+                }
+                """.trimIndent(),
+            )
+        val output = asyncTraitOrThrow(TokenStream.new(), input)
+        val rendered = output.toString()
+        assertTrue("Pin" in rendered, "Expected Pin in signature: $rendered")
+        assertTrue("Box :: pin" in rendered || "Box::pin" in rendered, "Expected Box::pin in default body: $rendered")
+    }
+
+    @Test
+    fun expandsContextReturningSelf() {
+        val input =
+            quote(
+                """
+                pub trait Context: Sized {
+                    async fn from_parts() -> Self;
+                }
+                """.trimIndent(),
+            )
+        val output = asyncTraitOrThrow(TokenStream.new(), input)
+        val rendered = output.toString()
+        assertTrue("Pin" in rendered, "Expected Pin in signature: $rendered")
+        assertTrue("Future" in rendered, "Expected Future in signature: $rendered")
+    }
 }
