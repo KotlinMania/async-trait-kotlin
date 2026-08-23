@@ -94,10 +94,14 @@ private class HasSelf(
 
     override fun visitReceiver(receiver: FnArg.Receiver) {
         found = true
+        super.visitReceiver(receiver)
     }
 
     override fun visitItem(i: Item) {
         // Do not recurse into nested items.
+        if (i is Item.Verbatim) {
+            // no-op
+        }
     }
 
     override fun visitMacro(mac: Macro) {
@@ -141,6 +145,7 @@ public object ReplaceSelf : VisitMut() {
 
     override fun visitIdent(id: Ident) {
         // Note: Ident in syn is immutable value wrapper, but when used in Path it can be updated
+        super.visitIdent(id)
     }
 
     override fun visitPath(p: Path) {
