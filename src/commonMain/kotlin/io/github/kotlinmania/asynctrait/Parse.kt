@@ -4,7 +4,6 @@ package io.github.kotlinmania.asynctrait
 import io.github.kotlinmania.procmacro2.Span
 import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.quote.ToTokens
-import io.github.kotlinmania.syn.ItemParse
 import io.github.kotlinmania.syn.ParseStream
 import io.github.kotlinmania.syn.SynError
 import io.github.kotlinmania.syn.SynResult
@@ -29,7 +28,7 @@ public sealed class Item : ToTokens {
 
     public companion object {
         public fun parse(input: ParseStream): SynResult<Item> {
-            val item = ItemParse.parse(input).getOrElse { return SynResult.failure(it) }
+            val item = SynItem.parse(input).getOrElse { return SynResult.failure(it) }
             return when (item) {
                 is SynItem.Trait -> SynResult.success(Trait(item))
                 is SynItem.Impl -> {
