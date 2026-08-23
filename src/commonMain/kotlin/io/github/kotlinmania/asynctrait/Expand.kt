@@ -33,7 +33,6 @@ import io.github.kotlinmania.syn.parse2
 import io.github.kotlinmania.syn.parseQuoteAttribute
 import io.github.kotlinmania.syn.parseQuotePat
 import io.github.kotlinmania.syn.parseQuoteStmtList
-import io.github.kotlinmania.syn.parseReturnType
 import io.github.kotlinmania.syn.token.Comma
 import io.github.kotlinmania.syn.token.Gt
 import io.github.kotlinmania.syn.token.Lt
@@ -474,7 +473,7 @@ public fun parseQuoteWherePredicate(tokenStream: TokenStream): WherePredicate {
 }
 
 public fun parseQuoteReturnType(tokenStream: TokenStream): ReturnType {
-    val result: SynResult<ReturnType> = parse2(::parseReturnType, tokenStream)
+    val result: SynResult<ReturnType> = parse2(ReturnType.Companion::parse, tokenStream)
     return result.fold(
         onSuccess = { it },
         onFailure = { throw it },
