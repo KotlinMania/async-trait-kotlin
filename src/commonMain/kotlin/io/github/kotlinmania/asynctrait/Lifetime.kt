@@ -14,7 +14,7 @@ import io.github.kotlinmania.syn.token.And
 import io.github.kotlinmania.syn.token.Paren
 import io.github.kotlinmania.syn.token.Plus
 
-public class CollectLifetimes : VisitMut() {
+internal class CollectLifetimes : VisitMut() {
     public val elided: MutableList<Lifetime> = mutableListOf()
     public val explicit: MutableList<Lifetime> = mutableListOf()
 
@@ -67,7 +67,7 @@ public class CollectLifetimes : VisitMut() {
     }
 }
 
-public object AddLifetimeToImplTrait : VisitMut() {
+internal object AddLifetimeToImplTrait : VisitMut() {
     override fun visitTypeImplTrait(ty: SynType.ImplTrait) {
         val span = ty.implToken.span
         val lifetimeBound = TypeParamBound.LifetimeBound(Lifetime.new("'async_trait", span))
