@@ -915,7 +915,11 @@ tasks.register("hostTests") {
 // Patch generated SPM package for macOS platform, Swift fixes and override keywords
 tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
     doLast {
-        val spmDir = layout.buildDirectory.dir("SPMPackage").orNull?.asFile
+        val spmDir =
+            layout.buildDirectory
+                .dir("SPMPackage")
+                .orNull
+                ?.asFile
         if (spmDir != null && spmDir.exists()) {
             spmDir.walkTopDown().forEach { file ->
                 if (file.name == "Package.swift") {
