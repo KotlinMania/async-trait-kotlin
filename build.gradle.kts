@@ -947,10 +947,6 @@ tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
                         text = text.replace("public func visitIdent(", "public override func visitIdent(")
                         modified = true
                     }
-                    if (text.contains("public func visitTokenStream(")) {
-                        text = text.replace("public func visitTokenStream(", "public override func visitTokenStream(")
-                        modified = true
-                    }
                     if (modified) {
                         file.writeText(text)
                     }

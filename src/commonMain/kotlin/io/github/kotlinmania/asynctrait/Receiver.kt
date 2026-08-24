@@ -111,7 +111,7 @@ private class HasSelf(
     }
 }
 
-public object ReplaceSelf : VisitMut() {
+internal object ReplaceSelf : VisitMut() {
     public fun visitTokenStream(tokens: TokenStream): Pair<TokenStream, Boolean> {
         val out = mutableListOf<TokenTree>()
         var modified = false
