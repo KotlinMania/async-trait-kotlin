@@ -15,7 +15,7 @@ import io.github.kotlinmania.syn.VisibilityParse
 import io.github.kotlinmania.syn.token.Default
 import io.github.kotlinmania.syn.token.Semi
 
-public data class VerbatimFn(
+internal data class VerbatimFn(
     public var attrs: MutableList<Attribute>,
     public var vis: Visibility,
     public var defaultness: Default?,
