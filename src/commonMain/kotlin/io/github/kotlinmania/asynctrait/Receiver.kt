@@ -143,11 +143,6 @@ public object ReplaceSelf : VisitMut() {
     private fun prependUnderscoreToSelf(ident: Ident): Boolean =
         ident.toString() == "self"
 
-    override fun visitIdent(id: Ident) {
-        // Note: Ident in syn is immutable value wrapper, but when used in Path it can be updated
-        super.visitIdent(id)
-    }
-
     override fun visitPath(p: Path) {
         if (p.segments.size == 1) {
             val segment = p.segments[0]
