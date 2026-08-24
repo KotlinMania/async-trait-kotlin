@@ -9,7 +9,7 @@ import io.github.kotlinmania.syn.SynError
 import io.github.kotlinmania.syn.SynResult
 import io.github.kotlinmania.syn.Item as SynItem
 
-public sealed class Item : ToTokens {
+internal sealed class Item : ToTokens {
     public data class Trait(
         public var item: SynItem.Trait,
     ) : Item() {

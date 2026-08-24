@@ -40,7 +40,7 @@ import io.github.kotlinmania.syn.token.Plus
 import io.github.kotlinmania.syn.token.Underscore
 import io.github.kotlinmania.syn.token.Where
 
-public sealed class Context {
+internal sealed class Context {
     public data class Trait(
         public val generics: Generics,
         public val supertraits: Supertraits,
@@ -69,7 +69,7 @@ public sealed class Context {
     }
 }
 
-public fun expand(input: Item, isLocal: Boolean) {
+internal fun expand(input: Item, isLocal: Boolean) {
     when (input) {
         is Item.Trait -> {
             val traitItem = input.item
@@ -105,47 +105,40 @@ public fun expand(input: Item, isLocal: Boolean) {
             }
             val context = Context.Impl(implItem.generics, associatedTypeImplTraits)
             for (inner in implItem.items) {
-                when (inner) {
-                    is ImplItem.Fn -> {
-                        if (inner.sig.asyncness != null) {
-                            val sig = inner.sig
-                            val block = inner.block
+                if (inner is ImplItem.Fn) {
+                    val sig = inner.sig
+                    if (sig.asyncness != null) {
+                        val hasSelf = hasSelfInSig(sig) || hasSelfInBlock(inner.block)
+                        transformBlock(context, sig, inner.block)
+                        transformSig(context, sig, hasSelf, false, isLocal)
+                        inner.attrs = inner.attrs + lintSuppressWithBody()
+                    }
+                } else if (inner is ImplItem.Verbatim) {
+                    val verbatimResult = parse2(VerbatimFn::parse, inner.tokens)
+                    if (verbatimResult is SynResult.Success) {
+                        val verbatim = verbatimResult.value
+                        val sig = verbatim.sig
+                        if (sig.asyncness != null) {
                             val hasSelf = hasSelfInSig(sig)
-                            transformBlock(context, sig, block)
                             transformSig(context, sig, hasSelf, false, isLocal)
-                            inner.attrs = inner.attrs + lintSuppressWithBody()
+                            verbatim.attrs.add(lintSuppressWithoutBody())
+                            inner.tokens = quote("#verbatim", "verbatim" to verbatim)
                         }
                     }
-                    is ImplItem.Verbatim -> {
-                        val parseResult = parse2(VerbatimFn::parse, inner.tokens)
-                        if (parseResult.isSuccess) {
-                            val method = parseResult.getOrThrow()
-                            if (method.sig.asyncness != null) {
-                                val sig = method.sig
-                                val hasSelf = hasSelfInSig(sig)
-                                transformSig(context, sig, hasSelf, false, isLocal)
-                                method.attrs.add(lintSuppressWithBody())
-                                val newTokens = TokenStream.new()
-                                method.toTokens(newTokens)
-                                inner.tokens = newTokens
-                            }
-                        }
-                    }
-                    else -> {}
                 }
             }
         }
     }
 }
 
-public fun lintSuppressWithBody(): Attribute =
+internal fun lintSuppressWithBody(): Attribute =
     parseQuoteAttribute(
         quote(
             "#[allow(elided_named_lifetimes, clippy::async_yields_async, clippy::diverging_sub_expression, clippy::let_unit_value, clippy::needless_arbitrary_self_type, clippy::no_effect_underscore_binding, clippy::shadow_same, clippy::type_complexity, clippy::type_repetition_in_bounds, clippy::used_underscore_binding)]",
         ),
     )
 
-public fun lintSuppressWithoutBody(): Attribute =
+internal fun lintSuppressWithoutBody(): Attribute =
     parseQuoteAttribute(
         quote(
             "#[allow(elided_named_lifetimes, clippy::type_complexity, clippy::type_repetition_in_bounds)]",
@@ -464,7 +457,7 @@ private object ReplaceImplTraitWithInfer : Fold() {
 private fun replaceImplTraitWithInfer(ty: SynType): SynType =
     ReplaceImplTraitWithInfer.foldType(ty)
 
-public fun parseQuoteWherePredicate(tokenStream: TokenStream): WherePredicate {
+internal fun parseQuoteWherePredicate(tokenStream: TokenStream): WherePredicate {
     val result: SynResult<WherePredicate> = parse2(WherePredicate.Companion::parse, tokenStream)
     return result.fold(
         onSuccess = { it },
@@ -472,7 +465,7 @@ public fun parseQuoteWherePredicate(tokenStream: TokenStream): WherePredicate {
     )
 }
 
-public fun parseQuoteReturnType(tokenStream: TokenStream): ReturnType {
+internal fun parseQuoteReturnType(tokenStream: TokenStream): ReturnType {
     val result: SynResult<ReturnType> = parse2(ReturnType.Companion::parse, tokenStream)
     return result.fold(
         onSuccess = { it },

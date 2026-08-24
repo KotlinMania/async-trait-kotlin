@@ -18,19 +18,19 @@ import io.github.kotlinmania.syn.SynType
 import io.github.kotlinmania.syn.gen.VisitMut
 import io.github.kotlinmania.syn.token.Mut
 
-public fun hasSelfInSig(sig: Signature): Boolean {
+internal fun hasSelfInSig(sig: Signature): Boolean {
     val visitor = HasSelf(false)
     visitor.visitSignature(sig)
     return visitor.found
 }
 
-public fun hasSelfInBlock(block: Block): Boolean {
+internal fun hasSelfInBlock(block: Block): Boolean {
     val visitor = HasSelf(false)
     visitor.visitBlock(block)
     return visitor.found
 }
 
-public fun mutPat(pat: Pat): Mut? {
+internal fun mutPat(pat: Pat): Mut? {
     val visitor = HasMutPat(null)
     visitor.visitPat(pat)
     return visitor.mutToken
