@@ -2,15 +2,15 @@
 
 **Generated:** 2026-08-25
 **Source:** tmp/async-trait/src
-**Target:** src
+**Target:** src/commonMain/kotlin
 
 ## Executive Summary
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
-| Function parity | 31/52 matched (target 66) | 59.6% |
-| Class/type parity | 12/13 matched (target 18) | 92.3% |
-| Combined symbol parity | 43/65 matched (target 84) | 66.2% |
+| Function parity | 31/52 matched (target 67) | 59.6% |
+| Class/type parity | 12/13 matched (target 19) | 92.3% |
+| Combined symbol parity | 43/65 matched (target 86) | 66.2% |
 | Average function body similarity | 0.53 | inline-code cosine |
 | Average documentation similarity | 0.05 | doc text cosine |
 | Missing source functions | 0 | 0% parity until ported |
@@ -18,8 +18,8 @@
 | Missing source symbol files | 0 | 0 symbols |
 | Cheat/scoring failures | 0 | forced to 0% |
 | Total source files | 8 | 100% |
-| Target units (paired) | 11 | - |
-| Target files (total) | 11 | - |
+| Target units (paired) | 12 | - |
+| Target files (total) | 12 | - |
 | Porting progress | 8 | 100.0% (matched) |
 | Missing files | 0 | 0.0% |
 
@@ -46,7 +46,7 @@ Every matched file is listed from lowest function body/parameter similarity upwa
 | 5 | `parse` | `asynctrait.Parse` | 0.59 | 1/1 matched (target 3) | _none_ | 1/1 matched (target 3) | _none_ | - | 0 | 204.1 |
 | 6 | `lib` | `asynctrait.AsyncTrait` | 0.71 | 1/1 matched (target 2) | _none_ | 0/0 matched | _none_ | - | 0 | 102.9 |
 | 7 | `bound` | `asynctrait.Bound` | 0.78 | 4/4 matched (target 11) | _none_ | 2/2 matched (target 3) | _none_ | - | 0 | 602.2 |
-| 8 | `verbatim` | `asynctrait.Verbatim` | 0.82 | 2/2 matched | _none_ | 1/1 matched | _none_ | - | 0 | 301.8 |
+| 8 | `verbatim` | `asynctrait.Verbatim` | 0.82 | 2/2 matched (target 3) | _none_ | 1/1 matched (target 2) | _none_ | - | 0 | 301.8 |
 
 ## Cheat Detection / Scoring Failures
 
