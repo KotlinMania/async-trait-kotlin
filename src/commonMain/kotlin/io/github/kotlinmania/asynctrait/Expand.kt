@@ -41,17 +41,17 @@ import io.github.kotlinmania.syn.token.Underscore
 import io.github.kotlinmania.syn.token.Where
 
 internal sealed class Context {
-    public data class Trait(
-        public val generics: Generics,
-        public val supertraits: Supertraits,
+    data class Trait(
+        val generics: Generics,
+        val supertraits: Supertraits,
     ) : Context()
 
-    public data class Impl(
-        public val implGenerics: Generics,
-        public val associatedTypeImplTraits: Set<String>,
+    data class Impl(
+        val implGenerics: Generics,
+        val associatedTypeImplTraits: Set<String>,
     ) : Context()
 
-    public fun lifetimes(used: List<Lifetime>): List<GenericParam.LifetimeParam> {
+    fun lifetimes(used: List<Lifetime>): List<GenericParam.LifetimeParam> {
         val generics =
             when (this) {
                 is Trait -> this.generics
