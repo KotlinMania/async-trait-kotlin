@@ -10,16 +10,11 @@ import io.github.kotlinmania.syn.SynResult
 import io.github.kotlinmania.syn.customKeyword
 
 /**
- * Parsed arguments to the `#[async_trait]` attribute macro.
+ * Parsed arguments to the async trait macro.
  *
- * The macro accepts either no arguments (`#[async_trait]`) or a single
- * `?Send` argument (`#[async_trait(?Send)]`). When `?Send` is present,
- * the generated async trait methods are `!Send` — the returned futures
- * are allowed to be non-Send, meaning they can only be awaited in the
- * task that spawned them.
- *
- * Without `?Send` (the default), the generated futures are `Send` and
- * can be freely moved across thread boundaries.
+ * The macro accepts either no arguments or a single Send modifier argument.
+ * When local is true, the generated async trait methods are allowed to produce
+ * non-Send futures. Without local, futures can be freely moved across threads.
  */
 data class Args(
     val local: Boolean,

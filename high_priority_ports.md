@@ -11,18 +11,17 @@ This list is complete and includes function/type detail for every matched file. 
 | Rank | Source | Target | Function similarity | Deps | Functions | Missing functions | Types | Missing types | SymDeficit | SrcSymbols | Priority |
 |------|--------|--------|------------|------|-----------|-------------------|-------|---------------|-----------|------------|----------|
 | 1 | `expand` | `asynctrait.Expand` | 0.45 | 1 | 10/13 matched (target 16) | `to_tokens`, `visit_type_path_mut`, `visit_type_mut` | 2/3 matched (target 4) | `AssociatedTypeImplTraits` | 4 | 16 | 1041605.5 |
-| 2 | `args` | `asynctrait.Args [ZERO]` | 0.00 | 1 | 2/3 matched (target 4) | `parse` | 1/1 matched (target 2) | _none_ | 1 | 4 | 1010410.0 |
+| 2 | `args` | `asynctrait.Args` | 0.42 | 1 | 2/3 matched (target 4) | `parse` | 1/1 matched (target 2) | _none_ | 1 | 4 | 1010405.8 |
 | 3 | `receiver` | `asynctrait.Receiver` | 0.33 | 0 | 7/16 matched | `visit_pat_ident_mut`, `visit_expr_path_mut`, `visit_type_path_mut`, `visit_receiver_mut`, `visit_item_mut`, `visit_macro_mut`, `visit_token_stream_impl`, `visit_ident_mut`, `visit_path_mut` | 3/3 matched | _none_ | 9 | 19 | 91906.7 |
 | 4 | `lifetime` | `asynctrait.Lifetime` | 0.19 | 0 | 4/12 matched | `new`, `visit_receiver_mut`, `visit_type_reference_mut`, `visit_generic_argument_mut`, `visit_type_impl_trait_mut`, `visit_type_ptr_mut`, `visit_type_bare_fn_mut`, `visit_expr_mut` | 2/2 matched | _none_ | 8 | 14 | 81408.1 |
 | 5 | `bound` | `asynctrait.Bound` | 0.78 | 0 | 4/4 matched (target 11) | _none_ | 2/2 matched (target 3) | _none_ | 0 | 6 | 602.2 |
 | 6 | `verbatim` | `asynctrait.Verbatim` | 0.82 | 0 | 2/2 matched | _none_ | 1/1 matched | _none_ | 0 | 3 | 301.8 |
 | 7 | `parse` | `asynctrait.Parse` | 0.59 | 0 | 1/1 matched (target 3) | _none_ | 1/1 matched (target 3) | _none_ | 0 | 2 | 204.1 |
-| 8 | `lib` | `asynctrait.AsyncTrait [ZERO]` | 0.00 | 0 | 1/1 matched (target 2) | _none_ | 0/0 matched | _none_ | 0 | 1 | 110.0 |
+| 8 | `lib` | `asynctrait.AsyncTrait` | 0.71 | 0 | 1/1 matched (target 2) | _none_ | 0/0 matched | _none_ | 0 | 1 | 102.9 |
 
 ## Cheat Detection / Scoring Failures
 
-- `args` -> `asynctrait.Args [ZERO]`: function-by-function score forced to 0. Args.kt: snake_case identifier `async_trait` in Kotlin comments; Args.kt: Rust attribute syntax in Kotlin comments
-- `lib` -> `asynctrait.AsyncTrait [ZERO]`: function-by-function score forced to 0. AsyncTrait.kt: snake_case identifier `async_trait` in Kotlin comments; AsyncTrait.kt: Rust lifetime explanation in Kotlin comments; AsyncTrait.kt: Rust-only type/unsafe terminology in Kotlin comments
+_None detected._
 
 ## Critical Issues (Function Similarity < 0.60 with Dependencies)
 
@@ -36,14 +35,13 @@ These files need immediate attention:
   - Types: 2/3 matched (target 4)
   - Missing types: `AssociatedTypeImplTraits`
 
-- **args** → `asynctrait.Args [ZERO]`
-  - Function similarity: 0.00
+- **args** → `asynctrait.Args`
+  - Function similarity: 0.42
   - Dependencies: 1
   - Functions: 2/3 matched (target 4)
   - Missing functions: `parse`
   - Types: 1/1 matched (target 2)
   - Missing types: _none_
-  - Scoring failure: Args.kt: snake_case identifier `async_trait` in Kotlin comments; Args.kt: Rust attribute syntax in Kotlin comments
 
 ## Missing Files (by Dependents)
 
