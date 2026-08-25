@@ -8,10 +8,10 @@ Based on AST analysis, here are the concrete next steps.
 - **Function parity:** 31/52 matched (target 66) — 59.6%
 - **Class/type parity:** 12/13 matched (target 18) — 92.3%
 - **Combined symbol parity:** 43/65 matched (target 84) — 66.2%
-- **Average inline-code cosine:** 0.39 (function body across 8 matched files)
-- **Average documentation cosine:** 0.08 (doc text across 8 matched files)
-- **Cheat-zeroed Files:** 2
-- **Critical Issues:** 6 files with <0.60 function similarity
+- **Average inline-code cosine:** 0.53 (function body across 8 matched files)
+- **Average documentation cosine:** 0.05 (doc text across 8 matched files)
+- **Cheat-zeroed Files:** 0
+- **Critical Issues:** 5 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -40,10 +40,10 @@ Every matched file is listed below with function and type symbol parity.
 
 ### 2. args
 
-- **Target:** `asynctrait.Args [ZERO]`
-- **Similarity:** 0.00
+- **Target:** `asynctrait.Args`
+- **Similarity:** 0.42
 - **Dependents:** 1
-- **Priority Score:** 1010410.0
+- **Priority Score:** 1010405.8
 - **Functions:** 2/3 matched (target 4)
 - **Missing functions:** `parse`
 - **Types:** 1/1 matched (target 2)
@@ -106,10 +106,10 @@ Every matched file is listed below with function and type symbol parity.
 
 ### 8. lib
 
-- **Target:** `asynctrait.AsyncTrait [ZERO]`
-- **Similarity:** 0.00
+- **Target:** `asynctrait.AsyncTrait`
+- **Similarity:** 0.71
 - **Dependents:** 0
-- **Priority Score:** 110.0
+- **Priority Score:** 102.9
 - **Functions:** 1/1 matched (target 2)
 - **Missing functions:** _none_
 - **Types:** 0/0 matched

@@ -7,10 +7,9 @@ import io.github.kotlinmania.syn.SynResult
 import io.github.kotlinmania.syn.parse2
 
 /**
- * Attribute macro to make async fn in traits work with dyn traits.
+ * Attribute macro to make async functions in traits work with dynamic dispatch.
  *
- * Async fns get transformed into methods that return
- * `Pin<Box<dyn Future + Send + 'async_trait>>` and delegate to an async block.
+ * Async functions are transformed into methods returning boxed futures.
  */
 public fun asyncTrait(args: TokenStream, input: TokenStream): SynResult<TokenStream> {
     val parsedArgs = parse2(::parseArgs, args).getOrElse { return SynResult.failure(it) }
