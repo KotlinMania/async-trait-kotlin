@@ -1,4 +1,4 @@
-// port-lint: source async-trait/src/args.rs
+// port-lint: source args.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.Span

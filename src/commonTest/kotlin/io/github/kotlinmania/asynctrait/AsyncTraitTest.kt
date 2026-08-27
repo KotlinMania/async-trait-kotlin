@@ -1,4 +1,4 @@
-// port-lint: tests async-trait/tests/test.rs
+// port-lint: tests tests/test.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.TokenStream
