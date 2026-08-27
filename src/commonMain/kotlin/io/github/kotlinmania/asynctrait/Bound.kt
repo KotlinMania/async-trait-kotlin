@@ -1,4 +1,4 @@
-// port-lint: source bound.rs
+// port-lint: source async-trait/src/bound.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.Ident

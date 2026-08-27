@@ -1,4 +1,4 @@
-// port-lint: source verbatim.rs
+// port-lint: source async-trait/src/verbatim.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.TokenStream

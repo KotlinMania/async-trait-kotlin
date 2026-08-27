@@ -1,4 +1,4 @@
-// port-lint: tests args.rs
+// port-lint: tests async-trait/src/args.rs
 package io.github.kotlinmania.asynctrait
 
 import kotlin.test.Test
