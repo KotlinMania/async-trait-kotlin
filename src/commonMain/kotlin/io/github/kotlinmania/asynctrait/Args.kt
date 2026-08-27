@@ -18,7 +18,12 @@ import io.github.kotlinmania.syn.customKeyword
  */
 data class Args(
     val local: Boolean,
-)
+) {
+    companion object {
+        fun parse(input: ParseStream): SynResult<Args> = parseArgs(input)
+    }
+}
+
 
 /**
  * Parses the attribute argument list, accepting either an empty input
