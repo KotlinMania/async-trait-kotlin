@@ -5,13 +5,13 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 8/8 (100.0%)
-- **Function parity:** 31/52 matched (target 67) — 59.6%
-- **Class/type parity:** 12/13 matched (target 19) — 92.3%
-- **Combined symbol parity:** 43/65 matched (target 86) — 66.2%
-- **Average inline-code cosine:** 0.53 (function body across 8 matched files)
+- **Function parity:** 32/52 matched (target 68) — 61.5%
+- **Class/type parity:** 13/13 matched (target 20) — 100.0%
+- **Combined symbol parity:** 45/65 matched (target 88) — 69.2%
+- **Average inline-code cosine:** 0.56 (function body across 8 matched files)
 - **Average documentation cosine:** 0.05 (doc text across 8 matched files)
 - **Cheat-zeroed Files:** 0
-- **Critical Issues:** 5 files with <0.60 function similarity
+- **Critical Issues:** 4 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -30,22 +30,22 @@ Every matched file is listed below with function and type symbol parity.
 ### 1. expand
 
 - **Target:** `asynctrait.Expand`
-- **Similarity:** 0.45
+- **Similarity:** 0.44
 - **Dependents:** 1
-- **Priority Score:** 1041605.5
+- **Priority Score:** 1031605.6
 - **Functions:** 10/13 matched (target 16)
 - **Missing functions:** `to_tokens`, `visit_type_path_mut`, `visit_type_mut`
-- **Types:** 2/3 matched (target 4)
-- **Missing types:** `AssociatedTypeImplTraits`
+- **Types:** 3/3 matched (target 5)
+- **Missing types:** _none_
 
 ### 2. args
 
 - **Target:** `asynctrait.Args`
-- **Similarity:** 0.42
+- **Similarity:** 0.64
 - **Dependents:** 1
-- **Priority Score:** 1010405.8
-- **Functions:** 2/3 matched (target 4)
-- **Missing functions:** `parse`
+- **Priority Score:** 1000403.6
+- **Functions:** 3/3 matched (target 5)
+- **Missing functions:** _none_
 - **Types:** 1/1 matched (target 2)
 - **Missing types:** _none_
 
