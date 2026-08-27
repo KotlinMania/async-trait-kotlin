@@ -417,8 +417,12 @@ internal class AssociatedTypeImplTraits(
     override fun visitTypePath(t: SynType.Path) {
         if (t.qself == null &&
             t.path.segments.size == 2 &&
-            t.path.segments[0].ident.toString() == "Self" &&
-            t.path.segments[1].ident.toString() in set
+            t.path.segments[0]
+                .ident
+                .toString() == "Self" &&
+            t.path.segments[1]
+                .ident
+                .toString() in set
         ) {
             contains = true
         }
@@ -435,7 +439,6 @@ private fun containsAssociatedTypeImplTrait(context: Context, ret: SynType): Boo
             visitor.contains
         }
     }
-
 
 private fun whereClauseOrDefault(generics: Generics): WhereClause {
     val existing = generics.whereClause
