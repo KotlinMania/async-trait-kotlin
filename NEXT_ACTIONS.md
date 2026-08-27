@@ -4,14 +4,14 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 8/27 (29.6%)
-- **Function parity:** 31/243 matched (target 67) — 12.8%
-- **Class/type parity:** 12/109 matched (target 19) — 11.0%
-- **Combined symbol parity:** 43/352 matched (target 86) — 12.2%
-- **Average inline-code cosine:** 0.51 (function body across 7 matched files)
-- **Average documentation cosine:** 0.00 (doc text across 7 matched files)
-- **Cheat-zeroed Files:** 1
-- **Critical Issues:** 6 files with <0.60 function similarity
+- **Files Present:** 8/8 (100.0%)
+- **Function parity:** 31/52 matched (target 67) — 59.6%
+- **Class/type parity:** 12/13 matched (target 19) — 92.3%
+- **Combined symbol parity:** 43/65 matched (target 86) — 66.2%
+- **Average inline-code cosine:** 0.53 (function body across 8 matched files)
+- **Average documentation cosine:** 0.05 (doc text across 8 matched files)
+- **Cheat-zeroed Files:** 0
+- **Critical Issues:** 5 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -27,7 +27,7 @@ No missing high-value files detected.
 
 Every matched file is listed below with function and type symbol parity.
 
-### 1. async-trait.expand
+### 1. expand
 
 - **Target:** `asynctrait.Expand`
 - **Similarity:** 0.45
@@ -38,7 +38,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 2/3 matched (target 4)
 - **Missing types:** `AssociatedTypeImplTraits`
 
-### 2. async-trait.args
+### 2. args
 
 - **Target:** `asynctrait.Args`
 - **Similarity:** 0.42
@@ -49,7 +49,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 1/1 matched (target 2)
 - **Missing types:** _none_
 
-### 3. async-trait.receiver
+### 3. receiver
 
 - **Target:** `asynctrait.Receiver`
 - **Similarity:** 0.33
@@ -60,7 +60,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 3/3 matched
 - **Missing types:** _none_
 
-### 4. async-trait.lifetime
+### 4. lifetime
 
 - **Target:** `asynctrait.Lifetime`
 - **Similarity:** 0.19
@@ -71,7 +71,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 2/2 matched
 - **Missing types:** _none_
 
-### 5. async-trait.bound
+### 5. bound
 
 - **Target:** `asynctrait.Bound`
 - **Similarity:** 0.78
@@ -82,7 +82,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 2/2 matched (target 3)
 - **Missing types:** _none_
 
-### 6. async-trait.verbatim
+### 6. verbatim
 
 - **Target:** `asynctrait.Verbatim`
 - **Similarity:** 0.82
@@ -93,7 +93,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 1/1 matched (target 2)
 - **Missing types:** _none_
 
-### 7. async-trait.parse
+### 7. parse
 
 - **Target:** `asynctrait.Parse`
 - **Similarity:** 0.59
@@ -104,12 +104,12 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 1/1 matched (target 3)
 - **Missing types:** _none_
 
-### 8. async-trait.lib
+### 8. lib
 
-- **Target:** `asynctrait.AsyncTrait [STUB]`
-- **Similarity:** 0.00
+- **Target:** `asynctrait.AsyncTrait`
+- **Similarity:** 0.71
 - **Dependents:** 0
-- **Priority Score:** 110.0
+- **Priority Score:** 102.9
 - **Functions:** 1/1 matched (target 2)
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
