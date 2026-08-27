@@ -24,7 +24,6 @@ data class Args(
     }
 }
 
-
 /**
  * Parses the attribute argument list, accepting either an empty input
  * or exactly `?Send`.
