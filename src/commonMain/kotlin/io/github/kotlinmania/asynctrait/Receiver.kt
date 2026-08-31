@@ -1,4 +1,4 @@
-// port-lint: source receiver.rs
+// port-lint: source async-trait/src/receiver.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.Group

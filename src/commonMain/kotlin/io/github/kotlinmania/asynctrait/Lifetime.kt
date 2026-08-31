@@ -1,4 +1,4 @@
-// port-lint: source lifetime.rs
+// port-lint: source async-trait/src/lifetime.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.Span
