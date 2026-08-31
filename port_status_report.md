@@ -2,7 +2,7 @@
 
 **Generated:** 2026-08-31
 **Source:** tmp
-**Target:** src
+**Target:** src/commonMain/kotlin/io/github/kotlinmania/asynctrait
 
 ## Executive Summary
 
