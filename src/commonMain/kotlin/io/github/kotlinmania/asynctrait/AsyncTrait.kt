@@ -1,4 +1,4 @@
-// port-lint: source async-trait/src/lib.rs
+// port-lint: source lib.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.TokenStream

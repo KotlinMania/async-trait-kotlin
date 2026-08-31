@@ -1,4 +1,4 @@
-// port-lint: tests async-trait/tests/test.rs
+// port-lint: tests lib.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.TokenStream
@@ -210,7 +210,7 @@ class AsyncTraitTest {
                 """
                 pub trait Trait {
                     async fn f() {
-                        unimplemented!()
+                        panic!()
                     }
                 }
                 """.trimIndent(),
