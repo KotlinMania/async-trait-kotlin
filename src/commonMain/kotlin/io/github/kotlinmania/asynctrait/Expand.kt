@@ -1,4 +1,4 @@
-// port-lint: source async-trait/src/expand.rs
+// port-lint: source expand.rs
 package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.Ident
