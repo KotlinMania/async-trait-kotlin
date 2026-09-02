@@ -4,10 +4,10 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 8/8 (100.0%)
-- **Function parity:** 31/51 matched (target 66) — 60.8%
-- **Class/type parity:** 13/13 matched (target 20) — 100.0%
-- **Combined symbol parity:** 44/64 matched (target 86) — 68.8%
+- **Files Present:** 8/27 (29.6%)
+- **Function parity:** 31/242 matched (target 66) — 12.8%
+- **Class/type parity:** 13/109 matched (target 20) — 11.9%
+- **Combined symbol parity:** 44/351 matched (target 86) — 12.5%
 - **Average inline-code cosine:** 0.56 (function body across 8 matched files)
 - **Average documentation cosine:** 0.05 (doc text across 8 matched files)
 - **Cheat-zeroed Files:** 0
@@ -27,9 +27,9 @@ No missing high-value files detected.
 
 Every matched file is listed below with function and type symbol parity.
 
-### 1. expand
+### 1. async-trait.expand
 
-- **Target:** `asynctrait.Expand`
+- **Target:** `asynctrait.Expand [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.44
 - **Dependents:** 1
 - **Priority Score:** 1031605.6
@@ -37,10 +37,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** `to_tokens`, `visit_type_path_mut`, `visit_type_mut`
 - **Types:** 3/3 matched (target 5)
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `expand.rs` vs expected `expand.rs`
+- **Proposed provenance header:** `// port-lint: source expand.rs` (current: `// port-lint: source expand.rs`)
+- **Lint issues:** 1
 
-### 2. args
+### 2. async-trait.args
 
-- **Target:** `asynctrait.Args`
+- **Target:** `asynctrait.Args [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.64
 - **Dependents:** 1
 - **Priority Score:** 1000403.6
@@ -48,10 +51,15 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 2)
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `args.rs` vs expected `args.rs`
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `tests:args.rs` vs expected `args.rs`
+- **Proposed provenance header:** `// port-lint: source args.rs` (current: `// port-lint: source args.rs`)
+- **Proposed provenance header:** `// port-lint: tests args.rs` (current: `// port-lint: tests args.rs`)
+- **Lint issues:** 2
 
-### 3. receiver
+### 3. async-trait.receiver
 
-- **Target:** `asynctrait.Receiver`
+- **Target:** `asynctrait.Receiver [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.33
 - **Dependents:** 0
 - **Priority Score:** 91906.7
@@ -59,10 +67,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** `visit_pat_ident_mut`, `visit_expr_path_mut`, `visit_type_path_mut`, `visit_receiver_mut`, `visit_item_mut`, `visit_macro_mut`, `visit_token_stream_impl`, `visit_ident_mut`, `visit_path_mut`
 - **Types:** 3/3 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `receiver.rs` vs expected `receiver.rs`
+- **Proposed provenance header:** `// port-lint: source receiver.rs` (current: `// port-lint: source receiver.rs`)
+- **Lint issues:** 1
 
-### 4. lifetime
+### 4. async-trait.lifetime
 
-- **Target:** `asynctrait.Lifetime`
+- **Target:** `asynctrait.Lifetime [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.19
 - **Dependents:** 0
 - **Priority Score:** 81408.1
@@ -70,10 +81,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** `new`, `visit_receiver_mut`, `visit_type_reference_mut`, `visit_generic_argument_mut`, `visit_type_impl_trait_mut`, `visit_type_ptr_mut`, `visit_type_bare_fn_mut`, `visit_expr_mut`
 - **Types:** 2/2 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `lifetime.rs` vs expected `lifetime.rs`
+- **Proposed provenance header:** `// port-lint: source lifetime.rs` (current: `// port-lint: source lifetime.rs`)
+- **Lint issues:** 1
 
-### 5. bound
+### 5. async-trait.bound
 
-- **Target:** `asynctrait.Bound`
+- **Target:** `asynctrait.Bound [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.78
 - **Dependents:** 0
 - **Priority Score:** 602.2
@@ -81,10 +95,15 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 2/2 matched (target 3)
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `bound.rs` vs expected `bound.rs`
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `tests:bound.rs` vs expected `bound.rs`
+- **Proposed provenance header:** `// port-lint: source bound.rs` (current: `// port-lint: source bound.rs`)
+- **Proposed provenance header:** `// port-lint: tests bound.rs` (current: `// port-lint: tests bound.rs`)
+- **Lint issues:** 2
 
-### 6. verbatim
+### 6. async-trait.verbatim
 
-- **Target:** `asynctrait.Verbatim`
+- **Target:** `asynctrait.Verbatim [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.82
 - **Dependents:** 0
 - **Priority Score:** 301.8
@@ -92,10 +111,15 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 2)
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `verbatim.rs` vs expected `verbatim.rs`
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `tests:verbatim.rs` vs expected `verbatim.rs`
+- **Proposed provenance header:** `// port-lint: source verbatim.rs` (current: `// port-lint: source verbatim.rs`)
+- **Proposed provenance header:** `// port-lint: tests verbatim.rs` (current: `// port-lint: tests verbatim.rs`)
+- **Lint issues:** 2
 
-### 7. parse
+### 7. async-trait.parse
 
-- **Target:** `asynctrait.Parse`
+- **Target:** `asynctrait.Parse [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.59
 - **Dependents:** 0
 - **Priority Score:** 204.1
@@ -103,6 +127,9 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 3)
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `parse.rs` vs expected `parse.rs`
+- **Proposed provenance header:** `// port-lint: source parse.rs` (current: `// port-lint: source parse.rs`)
+- **Lint issues:** 1
 
 ## Success Criteria
 
@@ -124,5 +151,5 @@ do not treat them as the next implementation target by default.
 
 | Source | Target | Path |
 |--------|--------|------|
-| `lib` | `asynctrait.AsyncTrait` | `lib` |
+| `async-trait.lib` | `asynctrait.AsyncTrait` | `async-trait/src/lib` |
 
