@@ -1,6 +1,6 @@
 # Code Port - Progress Report
 
-**Generated:** 2026-10-11
+**Generated:** 2026-10-12
 **Source:** tmp/async-trait/src
 **Target:** src/commonMain/kotlin/io/github/kotlinmania/asynctrait
 
@@ -12,14 +12,14 @@
 | Class/type parity | 13/13 matched (target 20) | 100.0% |
 | Combined symbol parity | 44/64 matched (target 86) | 68.8% |
 | Average function body similarity | 0.56 | inline-code cosine |
-| Average documentation similarity | 0.05 | doc text cosine |
+| Average documentation similarity | 0.03 | doc text cosine |
 | Missing source functions | 0 | 0% parity until ported |
 | Missing source classes/types | 0 | 0% parity until ported |
 | Missing source symbol files | 0 | 0 symbols |
 | Cheat/scoring failures | 0 | forced to 0% |
 | Total source files | 8 | 100% |
-| Target units (paired) | 12 | - |
-| Target files (total) | 12 | - |
+| Target units (paired) | 13 | - |
+| Target files (total) | 13 | - |
 | Porting progress | 8 | 100.0% (matched) |
 | Missing files | 0 | 0.0% |
 
@@ -77,11 +77,11 @@ No missing files detected.
 
 There is missing documentation that is hurting overall scoring.
 
-**Documentation coverage:** 16 / 430 lines (4%)
+**Documentation coverage:** 46 / 430 lines (11%)
 
 Documentation gaps (>20%), complete list:
 
-- `lib` - 99% gap (430 → 5 lines)
+- `lib` - 92% gap (430 → 35 lines)
 
 ## Reexport / Wiring Modules
 
