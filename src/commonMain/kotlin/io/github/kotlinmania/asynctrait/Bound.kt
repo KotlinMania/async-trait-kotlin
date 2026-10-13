@@ -41,13 +41,12 @@ fun hasBound(supertraits: Supertraits, bound: InferredBound): Boolean {
     for (supertrait in supertraits) {
         if (supertrait is TypeParamBound.Trait) {
             val path = supertrait.path
-            if (
-                path.isIdent(bound.asStr()) ||
+            val isMarkerPath =
                 path.segments.len() == 3 &&
-                (path.segments[0].ident.toString() == "std" || path.segments[0].ident.toString() == "core") &&
-                path.segments[1].ident.toString() == "marker" &&
-                path.segments[2].ident.toString() == bound.asStr()
-            ) {
+                    (path.segments[0].ident.toString() == "std" || path.segments[0].ident.toString() == "core") &&
+                    path.segments[1].ident.toString() == "marker" &&
+                    path.segments[2].ident.toString() == bound.asStr()
+            if (path.isIdent(bound.asStr()) || isMarkerPath) {
                 return true
             }
         }
