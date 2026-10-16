@@ -55,7 +55,7 @@ private fun containsFn(tokens: TokenStream): Boolean =
     }
 
 private class HasMutPat(
-    public var mutToken: Mut?,
+    var mutToken: Mut?,
 ) : VisitMut() {
     override fun visitPatIdent(patIdent: Pat.Ident) {
         val mutability = patIdent.mutability
@@ -68,7 +68,7 @@ private class HasMutPat(
 }
 
 private class HasSelf(
-    public var found: Boolean,
+    var found: Boolean,
 ) : VisitMut() {
     override fun visitExprPath(exprPath: Expr.Path) {
         if (!exprPath.path.segments.isEmpty() &&
@@ -112,7 +112,7 @@ private class HasSelf(
 }
 
 internal object ReplaceSelf : VisitMut() {
-    public fun visitTokenStream(tokens: TokenStream): Pair<TokenStream, Boolean> {
+    fun visitTokenStream(tokens: TokenStream): Pair<TokenStream, Boolean> {
         val out = mutableListOf<TokenTree>()
         var modified = false
         for (tt in tokens) {
@@ -150,8 +150,8 @@ internal object ReplaceSelf : VisitMut() {
                 segment.ident = Ident.new("__self", segment.ident.span())
             }
         }
-        for (segment in p.segments.toList()) {
-            visitPathArguments(segment.arguments)
+        for ((_, arguments) in p.segments.toList()) {
+            visitPathArguments(arguments)
         }
     }
 

@@ -15,8 +15,8 @@ import io.github.kotlinmania.syn.token.Paren
 import io.github.kotlinmania.syn.token.Plus
 
 internal class CollectLifetimes : VisitMut() {
-    public val elided: MutableList<Lifetime> = mutableListOf()
-    public val explicit: MutableList<Lifetime> = mutableListOf()
+    val elided: MutableList<Lifetime> = mutableListOf()
+    val explicit: MutableList<Lifetime> = mutableListOf()
 
     private fun visitOptLifetime(reference: And, lifetimeRef: Lifetime?): Lifetime =
         if (lifetimeRef == null) {

@@ -212,8 +212,7 @@ private fun transformSig(
         }
     }
 
-    for (param in context.lifetimes(lifetimes.explicit)) {
-        val paramLifetime = param.lifetime
+    for ((_, paramLifetime) in context.lifetimes(lifetimes.explicit)) {
         val pred = parseQuoteWherePredicate(quote("#param: 'async_trait", "param" to paramLifetime))
         whereClauseOrDefault(sig.generics).predicates.push(pred) { Comma.default() }
     }
@@ -406,9 +405,9 @@ private fun isArcSelf(ty: SynType.Path): Boolean {
 }
 
 private fun positionalArg(i: Int, pat: Pat): Ident =
-    Ident.new("__arg$i", pat.spanOrCallSite())
+    Ident.new("__arg$i", spanOrCallSite())
 
-private fun Pat.spanOrCallSite(): Span = Span.callSite()
+private fun spanOrCallSite(): Span = Span.callSite()
 
 internal class AssociatedTypeImplTraits(
     val set: Set<String>,
