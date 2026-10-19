@@ -16,14 +16,14 @@ import io.github.kotlinmania.syn.token.Default
 import io.github.kotlinmania.syn.token.Semi
 
 internal data class VerbatimFn(
-    public var attrs: MutableList<Attribute>,
-    public var vis: Visibility,
-    public var defaultness: Default?,
-    public var sig: Signature,
-    public var semiToken: Semi,
+    var attrs: MutableList<Attribute>,
+    var vis: Visibility,
+    var defaultness: Default?,
+    var sig: Signature,
+    var semiToken: Semi,
 ) : ToTokens {
-    public companion object {
-        public fun parse(input: ParseStream): SynResult<VerbatimFn> {
+    companion object {
+        fun parse(input: ParseStream): SynResult<VerbatimFn> {
             val attrs = Attribute.parseOuter(input).getOrElse { return SynResult.failure(it) }
             val visResult = VisibilityParse.parse(input)
             val vis = if (visResult.isSuccess) visResult.getOrThrow() else Visibility.Inherited

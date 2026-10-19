@@ -630,7 +630,7 @@ val wasmYarnVersion = providers.gradleProperty("wasm.yarn.version").getOrElse(ya
 // Dependabot cannot see, so a bump there would silently revert the build.)
 @Suppress("UNCHECKED_CAST")
 val webpackVersion: String =
-    (groovy.json.JsonSlurper().parse(rootProject.file("kotlin-js-store/package.json")) as Map<String, Any>)
+    (JsonSlurper().parse(rootProject.file("kotlin-js-store/package.json")) as Map<String, Any>)
         .let { it["dependencies"] as Map<String, Any> }["webpack"] as String
 
 rootProject.extensions.configure<NodeJsEnvSpec>("kotlinNodeJsSpec") { version.set(nodeVersion) }
@@ -672,8 +672,8 @@ val patchedKarmaWebpackPackage =
 //       NodeJsEnvSpec API gains equivalent properties. Track KGP release notes before removing.
 rootProject.extensions.configure<NodeJsRootExtension>("kotlinNodeJs") {
     versions.webpack.version = webpackVersion
-    versions.webpackCli.version = providers.gradleProperty("node.webpackCli.version").getOrElse("7.0.2")
-    versions.karma.version = providers.gradleProperty("node.karma.version").getOrElse("npm:karma-maintained@6.4.7")
+    versions.webpackCli.version = providers.gradleProperty("node.webpackCli.version").getOrElse("7.2.3")
+    versions.karma.version = providers.gradleProperty("node.karma.version").getOrElse("npm:karma-maintained@6.4.8")
     versions.karmaWebpack.version = "file:$patchedKarmaWebpackPackage"
     versions.mocha.version = providers.gradleProperty("node.mocha.version").getOrElse("12.0.0-beta-10")
     versions.kotlinWebHelpers.version = providers.gradleProperty("node.kotlinWebHelpers.version").getOrElse("3.1.0")
@@ -737,6 +737,7 @@ val publishProjectName = providers.gradleProperty("project.name").getOrElse("unn
 // an empty one to every Maven publication.
 val emptyJavadocJar =
     tasks.register<Jar>("emptyJavadocJar") {
+        description = ""
         archiveClassifier.set("javadoc")
     }
 

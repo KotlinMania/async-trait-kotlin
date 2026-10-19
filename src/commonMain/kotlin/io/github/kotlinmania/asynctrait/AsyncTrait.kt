@@ -41,15 +41,15 @@ import io.github.kotlinmania.syn.parse2
  * @param input The trait definition or implementation item to transform.
  * @return The desugared token stream as a [SynResult].
  */
-public fun asyncTrait(args: TokenStream, input: TokenStream): SynResult<TokenStream> {
+fun asyncTrait(args: TokenStream, input: TokenStream): SynResult<TokenStream> {
     val parsedArgs = parse2(::parseArgs, args).getOrElse { return SynResult.failure(it) }
     val item = parse2(Item::parse, input).getOrElse { return SynResult.failure(it) }
     expand(item, parsedArgs.local)
-    val tokens = quote("#item", "item" to item)
+    val tokens = quote("`#`item", "item" to item)
     return SynResult.success(tokens)
 }
 
-public fun asyncTraitOrThrow(args: TokenStream, input: TokenStream): TokenStream =
+fun asyncTraitOrThrow(args: TokenStream, input: TokenStream): TokenStream =
     asyncTrait(args, input).fold(
         onSuccess = { it },
         onFailure = { throw it },

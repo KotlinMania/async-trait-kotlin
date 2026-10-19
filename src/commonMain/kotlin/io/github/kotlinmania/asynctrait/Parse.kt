@@ -26,6 +26,13 @@ internal sealed class Item : ToTokens {
         }
     }
 
+    override fun toTokens(tokens: TokenStream) {
+        when (this) {
+            is Trait -> item.toTokens(tokens)
+            is Impl -> item.toTokens(tokens)
+        }
+    }
+
     companion object {
         fun parse(input: ParseStream): SynResult<Item> {
             val item = SynItem.parse(input).getOrElse { return SynResult.failure(it) }

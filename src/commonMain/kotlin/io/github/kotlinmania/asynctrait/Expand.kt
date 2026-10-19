@@ -28,17 +28,25 @@ import io.github.kotlinmania.syn.WhereClause
 import io.github.kotlinmania.syn.WherePredicate
 import io.github.kotlinmania.syn.WherePredicateList
 import io.github.kotlinmania.syn.gen.Fold
-import io.github.kotlinmania.syn.gen.Visit
+import io.github.kotlinmania.syn.gen.VisitMut
 import io.github.kotlinmania.syn.parse2
 import io.github.kotlinmania.syn.parseQuoteAttribute
 import io.github.kotlinmania.syn.parseQuotePat
 import io.github.kotlinmania.syn.parseQuoteStmtList
+import io.github.kotlinmania.syn.token.Colon
 import io.github.kotlinmania.syn.token.Comma
 import io.github.kotlinmania.syn.token.Gt
 import io.github.kotlinmania.syn.token.Lt
 import io.github.kotlinmania.syn.token.Plus
 import io.github.kotlinmania.syn.token.Underscore
 import io.github.kotlinmania.syn.token.Where
+
+internal fun toTokens(item: Item, tokens: TokenStream) {
+    when (item) {
+        is Item.Trait -> item.item.toTokens(tokens)
+        is Item.Impl -> item.item.toTokens(tokens)
+    }
+}
 
 internal sealed class Context {
     data class Trait(
@@ -121,8 +129,8 @@ internal fun expand(input: Item, isLocal: Boolean) {
                         if (sig.asyncness != null) {
                             val hasSelf = hasSelfInSig(sig)
                             transformSig(context, sig, hasSelf, false, isLocal)
-                            verbatim.attrs.add(lintSuppressWithoutBody())
-                            inner.tokens = quote("#verbatim", "verbatim" to verbatim)
+                            verbatim.attrs.add(lintSuppressWithBody())
+                            inner.tokens = quote("`#`verbatim", "verbatim" to verbatim)
                         }
                     }
                 }
@@ -157,7 +165,7 @@ private fun transformSig(
     val (retArrow, ret) =
         when (val out = sig.output) {
             is ReturnType.Default -> quote("->") to quote("()")
-            is ReturnType.TypeReturn -> quote("#arrow", "arrow" to out.arrowToken) to quote("#ty", "ty" to out.ty)
+            is ReturnType.TypeReturn -> quote("`#`arrow", "arrow" to out.arrowToken) to quote("`#`ty", "ty" to out.ty)
         }
 
     val lifetimes = CollectLifetimes()
@@ -179,9 +187,9 @@ private fun transformSig(
                     param.colonToken = null
                     val predTokens =
                         if (bounds.isEmpty()) {
-                            quote("#paramName: 'async_trait", "paramName" to paramName)
+                            quote("`#`paramName: 'async_trait", "paramName" to paramName)
                         } else {
-                            quote("#paramName: 'async_trait + #bounds", "paramName" to paramName, "bounds" to bounds)
+                            quote("`#`paramName: 'async_trait + `#`bounds", "paramName" to paramName, "bounds" to bounds)
                         }
                     val pred = parseQuoteWherePredicate(predTokens)
                     whereClauseOrDefault(sig.generics).predicates.push(pred) { Comma.default() }
@@ -198,9 +206,9 @@ private fun transformSig(
                     param.colonToken = null
                     val predTokens =
                         if (bounds.isEmpty()) {
-                            quote("#paramName: 'async_trait", "paramName" to paramName)
+                            quote("`#`paramName: 'async_trait", "paramName" to paramName)
                         } else {
-                            quote("#paramName: 'async_trait + #bounds", "paramName" to paramName, "bounds" to bounds)
+                            quote("`#`paramName: 'async_trait + `#`bounds", "paramName" to paramName, "bounds" to bounds)
                         }
                     val pred = parseQuoteWherePredicate(predTokens)
                     whereClauseOrDefault(sig.generics).predicates.push(pred) { Comma.default() }
@@ -212,9 +220,8 @@ private fun transformSig(
         }
     }
 
-    for (param in context.lifetimes(lifetimes.explicit)) {
-        val paramLifetime = param.lifetime
-        val pred = parseQuoteWherePredicate(quote("#param: 'async_trait", "param" to paramLifetime))
+    for ((_, paramLifetime) in context.lifetimes(lifetimes.explicit)) {
+        val pred = parseQuoteWherePredicate(quote("`#`param: 'async_trait", "param" to paramLifetime))
         whereClauseOrDefault(sig.generics).predicates.push(pred) { Comma.default() }
     }
 
@@ -227,7 +234,9 @@ private fun transformSig(
 
     for (elided in lifetimes.elided) {
         sig.generics.params.push(GenericParam.LifetimeParam.new(elided)) { Comma.default() }
-        val pred = parseQuoteWherePredicate(quote("#elided: 'async_trait", "elided" to elided))
+        val bounds = LifetimeList()
+        bounds.pushValue(Lifetime.new("'async_trait", Span.callSite()))
+        val pred = WherePredicate.LifetimePredicate(elided, Colon.default(), bounds)
         whereClauseOrDefault(sig.generics).predicates.push(pred) { Comma.default() }
     }
 
@@ -281,7 +290,7 @@ private fun transformSig(
                     b.toTokens(bTokens)
                     Plus.default().toTokens(bTokens)
                 }
-                quote("Self: #bTokens 'async_trait", "bTokens" to bTokens)
+                quote("Self: `#`bTokens 'async_trait", "bTokens" to bTokens)
             }
         whereClauseOrDefault(sig.generics).predicates.push(parseQuoteWherePredicate(selfPredTokens)) { Comma.default() }
     }
@@ -302,7 +311,7 @@ private fun transformSig(
                     } else {
                         val positional = positionalArg(i, pat)
                         val m = mutPat(pat)
-                        val newPatTokens = if (m != null) quote("#m #pos", "m" to m, "pos" to positional) else quote("#pos", "pos" to positional)
+                        val newPatTokens = if (m != null) quote("`#`m `#`pos", "m" to m, "pos" to positional) else quote("`#`pos", "pos" to positional)
                         arg.patType.pat = parseQuotePat(newPatTokens)
                     }
                 }
@@ -312,15 +321,14 @@ private fun transformSig(
     }
 
     val boundsToken = if (isLocal) quote("'async_trait") else quote("::core::marker::Send + 'async_trait")
-    sig.output =
-        parseQuoteReturnType(
-            quote(
-                "#retArrow ::core::pin::Pin<Box<dyn ::core::future::Future<Output = #ret> + #boundsToken>>",
-                "retArrow" to retArrow,
-                "ret" to ret,
-                "boundsToken" to boundsToken,
-            ),
+    val fullQuote =
+        quote(
+            "`#`retArrow ::core::pin::Pin<Box<dyn ::core::future::Future<Output = `#`ret> + `#`boundsToken>>",
+            "retArrow" to retArrow,
+            "ret" to ret,
+            "boundsToken" to boundsToken,
         )
+    sig.output = parseQuoteReturnType(fullQuote)
 }
 
 private fun transformBlock(context: Context, sig: Signature, block: Block) {
@@ -332,7 +340,11 @@ private fun transformBlock(context: Context, sig: Signature, block: Block) {
                 replaceSelf = true
                 val ident = Ident.new("__self", arg.selfToken.span)
                 val mutability = arg.mutability
-                decls.add(quote("let #mutability #ident = #self;", "mutability" to mutability, "ident" to ident, "self" to arg.selfToken))
+                if (mutability != null) {
+                    decls.add(quote("let mut `#`ident = `#`self;", "ident" to ident, "self" to arg.selfToken))
+                } else {
+                    decls.add(quote("let `#`ident = `#`self;", "ident" to ident, "self" to arg.selfToken))
+                }
             }
             is FnArg.Typed -> {
                 val attrs = arg.patType.attrs.filter { it.path().isIdent("cfg") }
@@ -342,14 +354,14 @@ private fun transformBlock(context: Context, sig: Signature, block: Block) {
                     val pat = arg.patType.pat as Pat.Ident
                     val ident = pat.ident
                     val mutability = pat.mutability
-                    decls.add(quote("#(#attrs)* let #mutability #ident = #ident;", "attrs" to attrs, "mutability" to mutability, "ident" to ident))
+                    decls.add(quote("`#`(`#`attrs)* let `#`mutability `#`ident = `#`ident;", "attrs" to attrs, "mutability" to mutability, "ident" to ident))
                 } else {
                     val pat = arg.patType.pat
                     val ident = positionalArg(i, pat)
                     if (pat is Pat.Wild) {
-                        decls.add(quote("#(#attrs)* let #ident = #ident;", "attrs" to attrs, "ident" to ident))
+                        decls.add(quote("`#`(`#`attrs)* let `#`ident = `#`ident;", "attrs" to attrs, "ident" to ident))
                     } else {
-                        decls.add(quote("#(#attrs)* let #pat = { let #ident = #ident; #ident };", "attrs" to attrs, "pat" to pat, "ident" to ident))
+                        decls.add(quote("`#`(`#`attrs)* let `#`pat = { let `#`ident = `#`ident; `#`ident };", "attrs" to attrs, "pat" to pat, "ident" to ident))
                     }
                 }
             }
@@ -363,20 +375,20 @@ private fun transformBlock(context: Context, sig: Signature, block: Block) {
     val letRet =
         when (val out = sig.output) {
             is ReturnType.Default -> {
-                quote("#(#decls)* let _: () = #block;", "decls" to decls, "block" to block)
+                quote("`#`(`#`decls)* let _: () = `#`block;", "decls" to decls, "block" to block)
             }
             is ReturnType.TypeReturn -> {
                 val ret = out.ty
                 if (containsAssociatedTypeImplTrait(context, ret)) {
                     if (decls.isEmpty()) {
-                        quote("#(#stmts)*", "stmts" to block.stmts)
+                        quote("`#`(`#`stmts)*", "stmts" to block.stmts)
                     } else {
-                        quote("#(#decls)* #block", "decls" to decls, "block" to block)
+                        quote("`#`(`#`decls)* `#`block", "decls" to decls, "block" to block)
                     }
                 } else {
                     val retCopy = replaceImplTraitWithInfer(ret.deepCopy())
                     quote(
-                        "if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<#ret> { #[allow(unreachable_code)] return __ret; } #(#decls)* let __ret: #ret = #block; #[allow(unreachable_code)] __ret",
+                        "if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<`#`ret> { #[allow(unreachable_code)] return __ret; } `#`(`#`decls)* let __ret: `#`ret = `#`block; #[allow(unreachable_code)] __ret",
                         "ret" to retCopy,
                         "decls" to decls,
                         "block" to block,
@@ -385,7 +397,7 @@ private fun transformBlock(context: Context, sig: Signature, block: Block) {
             }
         }
 
-    val boxPin = quote("Box::pin(async move { #letRet })", "letRet" to letRet)
+    val boxPin = quote("Box::pin(async move { `#`letRet })", "letRet" to letRet)
     block.stmts = parseQuoteStmtList(boxPin)
 }
 
@@ -406,27 +418,31 @@ private fun isArcSelf(ty: SynType.Path): Boolean {
 }
 
 private fun positionalArg(i: Int, pat: Pat): Ident =
-    Ident.new("__arg$i", pat.spanOrCallSite())
+    Ident.new("__arg$i", spanOrCallSite())
 
-private fun Pat.spanOrCallSite(): Span = Span.callSite()
+private fun spanOrCallSite(): Span = Span.callSite()
 
 internal class AssociatedTypeImplTraits(
     val set: Set<String>,
     var contains: Boolean = false,
-) : Visit() {
-    override fun visitTypePath(t: SynType.Path) {
-        if (t.qself == null &&
-            t.path.segments.size == 2 &&
-            t.path.segments[0]
+) : VisitMut() {
+    override fun visitTypePath(typePath: SynType.Path) {
+        if (typePath.qself == null &&
+            typePath.path.segments.size == 2 &&
+            typePath.path.segments[0]
                 .ident
                 .toString() == "Self" &&
-            t.path.segments[1]
+            typePath.path.segments[1]
                 .ident
                 .toString() in set
         ) {
             contains = true
         }
-        super.visitTypePath(t)
+        super.visitTypePath(typePath)
+    }
+
+    override fun visitTypePathMut(typePath: SynType.Path) {
+        super.visitTypePathMut(typePath)
     }
 }
 
@@ -448,7 +464,13 @@ private fun whereClauseOrDefault(generics: Generics): WhereClause {
     return newClause
 }
 
-private object ReplaceImplTraitWithInfer : Fold() {
+internal class ReplaceImplTraitWithInfer : VisitMut() {
+    override fun visitTypeMut(t: SynType) {
+        super.visitTypeMut(t)
+    }
+}
+
+private object ReplaceImplTraitWithInferFold : Fold() {
     override fun foldType(t: SynType): SynType =
         if (t is SynType.ImplTrait) {
             SynType.Infer(Underscore.from(t.implToken.span))
@@ -457,8 +479,10 @@ private object ReplaceImplTraitWithInfer : Fold() {
         }
 }
 
-private fun replaceImplTraitWithInfer(ty: SynType): SynType =
-    ReplaceImplTraitWithInfer.foldType(ty)
+private fun replaceImplTraitWithInfer(ty: SynType): SynType {
+    ReplaceImplTraitWithInfer().visitTypeMut(ty)
+    return ReplaceImplTraitWithInferFold.foldType(ty)
+}
 
 internal fun parseQuoteWherePredicate(tokenStream: TokenStream): WherePredicate {
     val result: SynResult<WherePredicate> = parse2(WherePredicate.Companion::parse, tokenStream)
