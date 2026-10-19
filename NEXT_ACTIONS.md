@@ -5,13 +5,15 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 8/8 (100.0%)
-- **Function parity:** 31/51 matched (target 66) — 60.8%
-- **Class/type parity:** 13/13 matched (target 20) — 100.0%
-- **Combined symbol parity:** 44/64 matched (target 86) — 68.8%
-- **Average inline-code cosine:** 0.56 (function body across 8 matched files)
+- **Function parity:** 54/54 matched (target 91) — 100.0%
+- **Class/type parity:** 13/13 matched (target 21) — 100.0%
+- **Combined symbol parity:** 67/67 matched (target 112) — 100.0%
+- **Average inline-code cosine:** 0.18 (function body across 8 matched files)
 - **Average documentation cosine:** 0.03 (doc text across 8 matched files)
 - **Cheat-zeroed Files:** 0
-- **Critical Issues:** 4 files with <0.60 function similarity
+- **Critical Issues:** 8 files with <0.60 function similarity
+- **Needs Review:** 0 files with 0.60-0.84 function similarity
+- **Excellent:** 0 files with >=0.85 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -30,20 +32,20 @@ Every matched file is listed below with function and type symbol parity.
 ### 1. expand
 
 - **Target:** `asynctrait.Expand`
-- **Similarity:** 0.44
+- **Similarity:** 0.11
 - **Dependents:** 1
-- **Priority Score:** 1031605.6
-- **Functions:** 10/13 matched (target 16)
-- **Missing functions:** `to_tokens`, `visit_type_path_mut`, `visit_type_mut`
-- **Types:** 3/3 matched (target 5)
+- **Priority Score:** 1001608.9
+- **Functions:** 13/13 matched (target 19)
+- **Missing functions:** _none_
+- **Types:** 3/3 matched (target 6)
 - **Missing types:** _none_
 
 ### 2. args
 
 - **Target:** `asynctrait.Args`
-- **Similarity:** 0.64
+- **Similarity:** 0.19
 - **Dependents:** 1
-- **Priority Score:** 1000403.6
+- **Priority Score:** 1000408.1
 - **Functions:** 3/3 matched (target 5)
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 2)
@@ -52,31 +54,32 @@ Every matched file is listed below with function and type symbol parity.
 ### 3. receiver
 
 - **Target:** `asynctrait.Receiver`
-- **Similarity:** 0.33
+- **Similarity:** 0.22
 - **Dependents:** 0
-- **Priority Score:** 91906.7
-- **Functions:** 7/16 matched
-- **Missing functions:** `visit_pat_ident_mut`, `visit_expr_path_mut`, `visit_type_path_mut`, `visit_receiver_mut`, `visit_item_mut`, `visit_macro_mut`, `visit_token_stream_impl`, `visit_ident_mut`, `visit_path_mut`
+- **Priority Score:** 2107.8
+- **Functions:** 18/18 matched (target 28)
+- **Missing functions:** _none_
 - **Types:** 3/3 matched
 - **Missing types:** _none_
+- **Lint issues:** 4
 
 ### 4. lifetime
 
 - **Target:** `asynctrait.Lifetime`
-- **Similarity:** 0.19
+- **Similarity:** 0.11
 - **Dependents:** 0
-- **Priority Score:** 81408.1
-- **Functions:** 4/12 matched
-- **Missing functions:** `new`, `visit_receiver_mut`, `visit_type_reference_mut`, `visit_generic_argument_mut`, `visit_type_impl_trait_mut`, `visit_type_ptr_mut`, `visit_type_bare_fn_mut`, `visit_expr_mut`
+- **Priority Score:** 1508.9
+- **Functions:** 13/13 matched (target 21)
+- **Missing functions:** _none_
 - **Types:** 2/2 matched
 - **Missing types:** _none_
 
 ### 5. bound
 
 - **Target:** `asynctrait.Bound`
-- **Similarity:** 0.78
+- **Similarity:** 0.29
 - **Dependents:** 0
-- **Priority Score:** 602.2
+- **Priority Score:** 607.1
 - **Functions:** 4/4 matched (target 11)
 - **Missing functions:** _none_
 - **Types:** 2/2 matched (target 3)
@@ -85,9 +88,9 @@ Every matched file is listed below with function and type symbol parity.
 ### 6. verbatim
 
 - **Target:** `asynctrait.Verbatim`
-- **Similarity:** 0.82
+- **Similarity:** 0.27
 - **Dependents:** 0
-- **Priority Score:** 301.8
+- **Priority Score:** 307.3
 - **Functions:** 2/2 matched (target 3)
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 2)
@@ -96,10 +99,10 @@ Every matched file is listed below with function and type symbol parity.
 ### 7. parse
 
 - **Target:** `asynctrait.Parse`
-- **Similarity:** 0.59
+- **Similarity:** 0.10
 - **Dependents:** 0
-- **Priority Score:** 204.1
-- **Functions:** 1/1 matched (target 3)
+- **Priority Score:** 209.0
+- **Functions:** 1/1 matched (target 4)
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 3)
 - **Missing types:** _none_

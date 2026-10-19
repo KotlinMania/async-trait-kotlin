@@ -1,6 +1,6 @@
 # Code Port - Progress Report
 
-**Generated:** 2026-10-12
+**Generated:** 2026-10-19
 **Source:** tmp/async-trait/src
 **Target:** src/commonMain/kotlin/io/github/kotlinmania/asynctrait
 
@@ -8,10 +8,10 @@
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
-| Function parity | 31/51 matched (target 66) | 60.8% |
-| Class/type parity | 13/13 matched (target 20) | 100.0% |
-| Combined symbol parity | 44/64 matched (target 86) | 68.8% |
-| Average function body similarity | 0.56 | inline-code cosine |
+| Function parity | 54/54 matched (target 91) | 100.0% |
+| Class/type parity | 13/13 matched (target 21) | 100.0% |
+| Combined symbol parity | 67/67 matched (target 112) | 100.0% |
+| Average function body similarity | 0.18 | inline-code cosine |
 | Average documentation similarity | 0.03 | doc text cosine |
 | Missing source functions | 0 | 0% parity until ported |
 | Missing source classes/types | 0 | 0% parity until ported |
@@ -25,13 +25,14 @@
 
 ## Port Quality Analysis
 
-**Average Function Similarity:** 0.56
+**Average Function Similarity:** 0.18
 
 Similarity in this report is the required function-by-function body/parameter score. Class/type parity and symbol deficits are reported beside it; whole-file shape is diagnostic only.
 
 **Work Distribution:**
-- Critical (<0.60): 4 files (50.0% of matched)
-- Needs review (0.60-0.84): 4 files (50.0% of matched)
+- Critical (<0.60): 8 files (100.0% of matched)
+- Needs review (0.60-0.84): 0 files (0.0% of matched)
+- Excellent (>=0.85): 0 files (0.0% of matched)
 
 ## Worst Function Scores First
 
@@ -39,13 +40,13 @@ Every matched file is listed from lowest function body/parameter similarity upwa
 
 | Rank | Source | Target | Function similarity | Functions | Missing functions | Types | Missing types | Tests | Symbol deficit | Priority |
 |------|--------|--------|---------------------|-----------|-------------------|-------|---------------|-------|----------------|----------|
-| 1 | `lifetime` | `asynctrait.Lifetime` | 0.19 | 4/12 matched | `new`, `visit_receiver_mut`, `visit_type_reference_mut`, `visit_generic_argument_mut`, `visit_type_impl_trait_mut`, `visit_type_ptr_mut`, `visit_type_bare_fn_mut`, `visit_expr_mut` | 2/2 matched | _none_ | - | 8 | 81408.1 |
-| 2 | `receiver` | `asynctrait.Receiver` | 0.33 | 7/16 matched | `visit_pat_ident_mut`, `visit_expr_path_mut`, `visit_type_path_mut`, `visit_receiver_mut`, `visit_item_mut`, `visit_macro_mut`, `visit_token_stream_impl`, `visit_ident_mut`, `visit_path_mut` | 3/3 matched | _none_ | - | 9 | 91906.7 |
-| 3 | `expand` | `asynctrait.Expand` | 0.44 | 10/13 matched (target 16) | `to_tokens`, `visit_type_path_mut`, `visit_type_mut` | 3/3 matched (target 5) | _none_ | - | 3 | 1031605.6 |
-| 4 | `parse` | `asynctrait.Parse` | 0.59 | 1/1 matched (target 3) | _none_ | 1/1 matched (target 3) | _none_ | - | 0 | 204.1 |
-| 5 | `args` | `asynctrait.Args` | 0.64 | 3/3 matched (target 5) | _none_ | 1/1 matched (target 2) | _none_ | - | 0 | 1000403.6 |
-| 6 | `bound` | `asynctrait.Bound` | 0.78 | 4/4 matched (target 11) | _none_ | 2/2 matched (target 3) | _none_ | - | 0 | 602.2 |
-| 7 | `verbatim` | `asynctrait.Verbatim` | 0.82 | 2/2 matched (target 3) | _none_ | 1/1 matched (target 2) | _none_ | - | 0 | 301.8 |
+| 1 | `parse` | `asynctrait.Parse` | 0.10 | 1/1 matched (target 4) | _none_ | 1/1 matched (target 3) | _none_ | - | 0 | 209.0 |
+| 2 | `lifetime` | `asynctrait.Lifetime` | 0.11 | 13/13 matched (target 21) | _none_ | 2/2 matched | _none_ | - | 0 | 1508.9 |
+| 3 | `expand` | `asynctrait.Expand` | 0.11 | 13/13 matched (target 19) | _none_ | 3/3 matched (target 6) | _none_ | - | 0 | 1001608.9 |
+| 4 | `args` | `asynctrait.Args` | 0.19 | 3/3 matched (target 5) | _none_ | 1/1 matched (target 2) | _none_ | - | 0 | 1000408.1 |
+| 5 | `receiver` | `asynctrait.Receiver` | 0.22 | 18/18 matched (target 28) | _none_ | 3/3 matched | _none_ | - | 0 | 2107.8 |
+| 6 | `verbatim` | `asynctrait.Verbatim` | 0.27 | 2/2 matched (target 3) | _none_ | 1/1 matched (target 2) | _none_ | - | 0 | 307.3 |
+| 7 | `bound` | `asynctrait.Bound` | 0.29 | 4/4 matched (target 11) | _none_ | 2/2 matched (target 3) | _none_ | - | 0 | 607.1 |
 
 ## Cheat Detection / Scoring Failures
 
@@ -55,10 +56,13 @@ _None detected._
 
 These files need significant work:
 
-- `lifetime` -> `asynctrait.Lifetime` (0.19)
-- `receiver` -> `asynctrait.Receiver` (0.33)
-- `expand` -> `asynctrait.Expand` (0.44, 1 deps)
-- `parse` -> `asynctrait.Parse` (0.59)
+- `parse` -> `asynctrait.Parse` (0.10)
+- `lifetime` -> `asynctrait.Lifetime` (0.11)
+- `expand` -> `asynctrait.Expand` (0.11, 1 deps)
+- `args` -> `asynctrait.Args` (0.19, 1 deps)
+- `receiver` -> `asynctrait.Receiver` (0.22)
+- `verbatim` -> `asynctrait.Verbatim` (0.27)
+- `bound` -> `asynctrait.Bound` (0.29)
 
 ## Incorrect Ports (Missing Types)
 
@@ -75,9 +79,9 @@ No missing files detected.
 
 ## Documentation Gaps
 
-There is missing documentation that is hurting overall scoring.
+Documentation correspondence is incomplete; it is reported separately from implementation scoring.
 
-**Documentation coverage:** 46 / 430 lines (11%)
+**Documentation line amount:** 46 / 430 lines (11%)
 
 Documentation gaps (>20%), complete list:
 

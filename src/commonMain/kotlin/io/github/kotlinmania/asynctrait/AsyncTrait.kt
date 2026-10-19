@@ -45,7 +45,7 @@ fun asyncTrait(args: TokenStream, input: TokenStream): SynResult<TokenStream> {
     val parsedArgs = parse2(::parseArgs, args).getOrElse { return SynResult.failure(it) }
     val item = parse2(Item::parse, input).getOrElse { return SynResult.failure(it) }
     expand(item, parsedArgs.local)
-    val tokens = quote("#item", "item" to item)
+    val tokens = quote("`#`item", "item" to item)
     return SynResult.success(tokens)
 }
 

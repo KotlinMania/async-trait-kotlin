@@ -14,9 +14,13 @@ import io.github.kotlinmania.syn.token.And
 import io.github.kotlinmania.syn.token.Paren
 import io.github.kotlinmania.syn.token.Plus
 
-internal class CollectLifetimes : VisitMut() {
-    val elided: MutableList<Lifetime> = mutableListOf()
-    val explicit: MutableList<Lifetime> = mutableListOf()
+internal class CollectLifetimes(
+    val elided: MutableList<Lifetime> = mutableListOf(),
+    val explicit: MutableList<Lifetime> = mutableListOf(),
+) : VisitMut() {
+    companion object {
+        fun new(): CollectLifetimes = CollectLifetimes()
+    }
 
     private fun visitOptLifetime(reference: And, lifetimeRef: Lifetime?): Lifetime =
         if (lifetimeRef == null) {
@@ -53,10 +57,18 @@ internal class CollectLifetimes : VisitMut() {
         }
     }
 
+    override fun visitReceiverMut(receiver: FnArg.Receiver) {
+        super.visitReceiverMut(receiver)
+    }
+
     override fun visitTypeReference(ty: SynType.Reference) {
         val updated = visitOptLifetime(ty.andToken, ty.lifetime)
         ty.lifetime = updated
         super.visitTypeReference(ty)
+    }
+
+    override fun visitTypeReferenceMut(ty: SynType.Reference) {
+        super.visitTypeReferenceMut(ty)
     }
 
     override fun visitGenericArgument(genArg: GenericArgument) {
@@ -64,6 +76,10 @@ internal class CollectLifetimes : VisitMut() {
             visitLifetime(genArg.lifetime)
         }
         super.visitGenericArgument(genArg)
+    }
+
+    override fun visitGenericArgumentMut(genArg: GenericArgument) {
+        super.visitGenericArgumentMut(genArg)
     }
 }
 
@@ -81,14 +97,26 @@ internal object AddLifetimeToImplTrait : VisitMut() {
         super.visitTypeImplTrait(ty)
     }
 
+    override fun visitTypeImplTraitMut(ty: SynType.ImplTrait) {
+        super.visitTypeImplTraitMut(ty)
+    }
+
     override fun visitTypeReference(ty: SynType.Reference) {
         parenthesizeImplTrait(ty.elem) { ty.elem = it }
         super.visitTypeReference(ty)
     }
 
+    override fun visitTypeReferenceMut(ty: SynType.Reference) {
+        super.visitTypeReferenceMut(ty)
+    }
+
     override fun visitTypePtr(ty: SynType.Ptr) {
         parenthesizeImplTrait(ty.elem) { ty.elem = it }
         super.visitTypePtr(ty)
+    }
+
+    override fun visitTypePtrMut(ty: SynType.Ptr) {
+        super.visitTypePtrMut(ty)
     }
 
     override fun visitTypeBareFn(ty: SynType.BareFn) {
@@ -99,10 +127,15 @@ internal object AddLifetimeToImplTrait : VisitMut() {
         super.visitTypeBareFn(ty)
     }
 
-    override fun visitExpr(e: io.github.kotlinmania.syn.Expr): io.github.kotlinmania.syn.Expr {
-        // Do not recurse into impl Traits inside of an array length expression.
-        return e
+    override fun visitTypeBareFnMut(ty: SynType.BareFn) {
+        super.visitTypeBareFnMut(ty)
     }
+
+    override fun visitExpr(e: io.github.kotlinmania.syn.Expr): io.github.kotlinmania.syn.Expr =
+        // Do not recurse into impl Traits inside of an array length expression.
+        e
+
+    override fun visitExprMut(e: io.github.kotlinmania.syn.Expr): io.github.kotlinmania.syn.Expr = e
 }
 
 private fun parenthesizeImplTrait(elem: SynType, setter: (SynType) -> Unit) {

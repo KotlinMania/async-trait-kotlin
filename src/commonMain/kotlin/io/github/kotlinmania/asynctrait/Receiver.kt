@@ -65,6 +65,10 @@ private class HasMutPat(
             super.visitPatIdent(patIdent)
         }
     }
+
+    override fun visitPatIdentMut(patIdent: Pat.Ident) {
+        super.visitPatIdentMut(patIdent)
+    }
 }
 
 private class HasSelf(
@@ -81,6 +85,10 @@ private class HasSelf(
         super.visitExprPath(exprPath)
     }
 
+    override fun visitExprPathMut(exprPath: Expr.Path) {
+        super.visitExprPathMut(exprPath)
+    }
+
     override fun visitTypePath(typePath: SynType.Path) {
         if (!typePath.path.segments.isEmpty() &&
             typePath.path.segments[0]
@@ -92,16 +100,25 @@ private class HasSelf(
         super.visitTypePath(typePath)
     }
 
+    override fun visitTypePathMut(typePath: SynType.Path) {
+        super.visitTypePathMut(typePath)
+    }
+
     override fun visitReceiver(receiver: FnArg.Receiver) {
         found = true
         super.visitReceiver(receiver)
     }
 
+    override fun visitReceiverMut(receiver: FnArg.Receiver) {
+        super.visitReceiverMut(receiver)
+    }
+
     override fun visitItem(i: Item) {
         // Do not recurse into nested items.
-        if (i is Item.Verbatim) {
-            // no-op
-        }
+    }
+
+    override fun visitItemMut(i: Item) {
+        // Do not recurse into nested items.
     }
 
     override fun visitMacro(mac: Macro) {
@@ -109,26 +126,42 @@ private class HasSelf(
             found = found || hasSelfInTokenStream(mac.tokens)
         }
     }
+
+    override fun visitMacroMut(mac: Macro) {
+        super.visitMacroMut(mac)
+    }
 }
 
 internal object ReplaceSelf : VisitMut() {
+    fun prependUnderscoreToSelf(ident: Ident): Boolean =
+        ident.toString() == "self"
+
     fun visitTokenStream(tokens: TokenStream): Pair<TokenStream, Boolean> {
         val out = mutableListOf<TokenTree>()
         var modified = false
+        visitTokenStreamImpl(tokens, out) { modified = it || modified }
+        return (if (modified) TokenStream.fromTokenTrees(out) else tokens) to modified
+    }
+
+    fun visitTokenStreamImpl(
+        tokens: TokenStream,
+        out: MutableList<TokenTree>,
+        setModified: (Boolean) -> Unit,
+    ) {
         for (tt in tokens) {
             when (tt) {
                 is TokenTree.Ident -> {
                     var ident = tt.value
                     if (prependUnderscoreToSelf(ident)) {
                         ident = Ident.new("__self", ident.span())
-                        modified = true
+                        setModified(true)
                     }
                     out.add(TokenTree.Ident(ident))
                 }
                 is TokenTree.Group -> {
                     val (innerStream, groupModified) = visitTokenStream(tt.value.stream())
                     if (groupModified) {
-                        modified = true
+                        setModified(true)
                     }
                     val newGroup = Group(tt.value.delimiter(), innerStream)
                     newGroup.setSpan(tt.value.span())
@@ -137,11 +170,15 @@ internal object ReplaceSelf : VisitMut() {
                 else -> out.add(tt)
             }
         }
-        return (if (modified) TokenStream.fromTokenTrees(out) else tokens) to modified
     }
 
-    private fun prependUnderscoreToSelf(ident: Ident): Boolean =
-        ident.toString() == "self"
+    override fun visitIdent(id: Ident) {
+        // Identifier replaced at caller site
+    }
+
+    override fun visitIdentMut(id: Ident) {
+        // Identifier replaced at caller site
+    }
 
     override fun visitPath(p: Path) {
         if (p.segments.size == 1) {
@@ -153,6 +190,10 @@ internal object ReplaceSelf : VisitMut() {
         for ((_, arguments) in p.segments.toList()) {
             visitPathArguments(arguments)
         }
+    }
+
+    override fun visitPathMut(p: Path) {
+        super.visitPathMut(p)
     }
 
     override fun visitItem(i: Item) {
@@ -171,6 +212,10 @@ internal object ReplaceSelf : VisitMut() {
         }
     }
 
+    override fun visitItemMut(i: Item) {
+        super.visitItemMut(i)
+    }
+
     override fun visitMacro(mac: Macro) {
         if (!containsFn(mac.tokens)) {
             val (newTokens, modified) = visitTokenStream(mac.tokens)
@@ -178,5 +223,9 @@ internal object ReplaceSelf : VisitMut() {
                 mac.tokens = newTokens
             }
         }
+    }
+
+    override fun visitMacroMut(mac: Macro) {
+        super.visitMacroMut(mac)
     }
 }

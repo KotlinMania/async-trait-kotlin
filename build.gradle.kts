@@ -672,8 +672,8 @@ val patchedKarmaWebpackPackage =
 //       NodeJsEnvSpec API gains equivalent properties. Track KGP release notes before removing.
 rootProject.extensions.configure<NodeJsRootExtension>("kotlinNodeJs") {
     versions.webpack.version = webpackVersion
-    versions.webpackCli.version = providers.gradleProperty("node.webpackCli.version").getOrElse("7.0.2")
-    versions.karma.version = providers.gradleProperty("node.karma.version").getOrElse("npm:karma-maintained@6.4.7")
+    versions.webpackCli.version = providers.gradleProperty("node.webpackCli.version").getOrElse("7.2.3")
+    versions.karma.version = providers.gradleProperty("node.karma.version").getOrElse("npm:karma-maintained@6.4.8")
     versions.karmaWebpack.version = "file:$patchedKarmaWebpackPackage"
     versions.mocha.version = providers.gradleProperty("node.mocha.version").getOrElse("12.0.0-beta-10")
     versions.kotlinWebHelpers.version = providers.gradleProperty("node.kotlinWebHelpers.version").getOrElse("3.1.0")
