@@ -1,6 +1,5 @@
 import groovy.json.JsonSlurper
 import org.gradle.api.GradleException
-import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
 import org.gradle.api.tasks.testing.AbstractTestTask
@@ -12,7 +11,9 @@ import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
+import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec
@@ -21,6 +22,7 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
+import org.jetbrains.kotlin.konan.target.Family
 import java.io.ByteArrayInputStream
 import java.net.URI
 import java.net.http.HttpClient
@@ -31,6 +33,7 @@ import java.nio.file.StandardCopyOption
 import java.util.Base64
 import java.util.UUID
 import java.util.zip.ZipInputStream
+import kotlin.jvm.optionals.getOrNull
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -50,12 +53,13 @@ val frameworkName = providers.gradleProperty("project.frameworkName").getOrElse(
 val projectNamespace = providers.gradleProperty("project.namespace").getOrElse("io.github.kotlinmania")
 val kotlinVersion = providers.gradleProperty("versions.kotlin").getOrElse("2.4.0")
 val commonMainBundleName = providers.gradleProperty("project.dependencies.commonMainBundle").get()
-val commonMainDependencyBundle =
-    extensions
-        .getByType(VersionCatalogsExtension::class.java)
-        .named("libs")
-        .findBundle(commonMainBundleName)
-        .orElseThrow { GradleException("Missing libs bundle '$commonMainBundleName'") }
+val libsCatalog = versionCatalogs.named("libs")
+
+fun libsBundle(bundleName: String) =
+    libsCatalog.findBundle(bundleName).getOrNull()
+        ?: throw GradleException("Missing libs bundle '$bundleName'")
+
+val commonMainDependencyBundle = libsBundle(commonMainBundleName)
 
 fun csvProperty(name: String): Set<String> =
     providers
@@ -80,21 +84,27 @@ val benchmarkEnabled = "benchmark" in enabledFeatureNames
 val benchmarkTargetNames = csvProperty("project.benchmark.targets")
 val commonBenchmarkBundleName = optionalTrimmedProperty("project.dependencies.commonBenchmarkBundle")
 val commonBenchmarkDependencyBundle =
-    commonBenchmarkBundleName?.let { bundleName ->
-        extensions
-            .getByType(VersionCatalogsExtension::class.java)
-            .named("libs")
-            .findBundle(bundleName)
-            .orElseThrow { GradleException("Missing libs bundle '$bundleName'") }
-    }
-val commonTestBundleName = optionalTrimmedProperty("project.dependencies.commonTestBundle")
-val commonTestDependencyBundle =
-    commonTestBundleName?.let { bundleName ->
-        extensions
-            .getByType(VersionCatalogsExtension::class.java)
-            .named("libs")
-            .findBundle(bundleName)
-            .orElseThrow { GradleException("Missing libs bundle '$bundleName'") }
+    commonBenchmarkBundleName?.let(::libsBundle)
+
+// Dependencies reach every source set, not only commonMain. A source set takes
+// the catalog bundle named <prefix>-<sourceSetName> whenever the catalog defines
+// one (async-trait-commonMain, async-trait-jsMain, async-trait-nodeMain,
+// async-trait-wasmJsMain, async-trait-jvmMain, async-trait-androidMain,
+// async-trait-appleMain, async-trait-nativeMain, and their Test counterparts),
+// and the npm packages listed in project.npm.<sourceSetName> as comma-separated
+// name@version entries. The prefix defaults to the commonMain bundle name with
+// its -commonMain suffix removed.
+val dependencyBundlePrefix =
+    optionalTrimmedProperty("project.dependencies.bundlePrefix")
+        ?: commonMainBundleName.removeSuffix("-commonMain")
+
+fun npmPackages(sourceSetName: String): List<Pair<String, String>> =
+    csvProperty("project.npm.$sourceSetName").map { spec ->
+        val separator = spec.lastIndexOf('@')
+        if (separator <= 0) {
+            throw GradleException("project.npm.$sourceSetName entry '$spec' must be name@version")
+        }
+        spec.substring(0, separator) to spec.substring(separator + 1)
     }
 if (benchmarkEnabled && commonBenchmarkDependencyBundle == null) {
     throw GradleException("Feature 'benchmark' requires project.dependencies.commonBenchmarkBundle")
@@ -505,7 +515,16 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            commonTestDependencyBundle?.let { implementation(it) }
+        }
+        configureEach {
+            val sourceSetName = name
+            val bundle =
+                if (sourceSetName == "commonMain") null else libsCatalog.findBundle("$dependencyBundlePrefix-$sourceSetName").getOrNull()
+            val packages = npmPackages(sourceSetName)
+            dependencies {
+                bundle?.let { implementation(it) }
+                packages.forEach { (packageName, packageVersion) -> implementation(npm(packageName, packageVersion)) }
+            }
         }
         if (benchmarkEnabled) {
             val commonBenchmark = maybeCreate("commonBenchmark")
@@ -967,15 +986,11 @@ tasks.register("setupAndroidSdk") {
 // mean the target surface drifted and must fail loudly.
 tasks.register("hostTests") {
     group = "verification"
-    description = "Runs the required real test suite (jvm, macosArm64, js, wasmJs, wasmWasi, android host)."
+    description = "Runs every enabled target's tests that this host can execute, plus Android host tests."
     dependsOn(
-        "jvmTest",
-        "macosArm64Test",
         "kotlinUpgradeYarnLock",
-        "jsNodeTest",
         "kotlinWasmUpgradeYarnLock",
-        "wasmJsNodeTest",
-        "wasmWasiNodeTest",
+        "allTests",
         "testAndroidHostTest",
     )
 }
@@ -1111,6 +1126,44 @@ kotlin.targets.configureEach {
     }
 }
 
+// Everything a declared target produces: every compilation's compile and
+// lifecycle task, its jar/klib artifact, and for native targets every link task
+// of every declared binary (static, shared, framework, test executable).
+fun Task.dependsOnTargetOutputs(target: KotlinTarget) {
+    dependsOn(target.artifactsTaskName)
+    target.compilations.configureEach {
+        val lifecycleTaskName = compileAllTaskName
+        dependsOn(compileTaskProvider)
+        // The Android library target names a <compilation>Classes lifecycle task
+        // that the Android plugin never registers; depend on it only if it exists.
+        dependsOn(tasks.named { it == lifecycleTaskName })
+    }
+    if (target.platformType == KotlinPlatformType.androidJvm) {
+        // The AAR and the host and device test packages are variant outputs, not
+        // the target's artifact task.
+        dependsOn("assembleAndroidMain", "assembleAndroidHostTest", "assembleAndroidDeviceTest")
+    }
+    if (target is KotlinNativeTarget) {
+        dependsOn("${target.name}Binaries", "${target.name}TestBinaries")
+        target.binaries.configureEach {
+            dependsOn(linkTaskProvider)
+        }
+    }
+}
+
+// Every test run the target declares. Runs the host cannot execute (Linux on
+// macOS, Windows elsewhere) are skipped by the Kotlin plugin, not by this list.
+fun Task.dependsOnTargetTests(target: KotlinTarget) {
+    if (target is KotlinTargetWithTests<*, *>) {
+        target.testRuns.configureEach {
+            dependsOn("${target.name}${name.replaceFirstChar(Char::uppercaseChar)}")
+        }
+    }
+    if (target.platformType == KotlinPlatformType.androidJvm) {
+        dependsOn("testAndroidHostTest")
+    }
+}
+
 tasks.named("build") {
     dependsOn(
         "kotlinUpgradeYarnLock",
@@ -1120,27 +1173,59 @@ tasks.named("build") {
         "swiftExportSmokeTest",
         "assemble${frameworkName}XCFramework",
     )
-    kotlin.targets.configureEach {
-        val target = this
-        dependsOn(target.artifactsTaskName)
-        target.compilations.configureEach {
-            dependsOn(compileTaskProvider)
-            dependsOn(compileAllTaskName)
-        }
-        if (target is KotlinNativeTarget) {
-            dependsOn("${target.name}Binaries", "${target.name}TestBinaries")
-            target.binaries.configureEach {
-                dependsOn(linkTaskProvider)
+    kotlin.targets.configureEach { dependsOnTargetOutputs(this) }
+}
+
+// ============================================================================
+// Per-platform CI aggregates
+// ----------------------------------------------------------------------------
+// Each platform workflow under .github/workflows calls exactly one of these, so
+// the task list lives in the build and the workflow cannot drift from it. Each
+// aggregate builds every output of its platform's declared targets and runs
+// every test the runner host can execute. Targets join an aggregate by platform
+// family, so adding a target to the kotlin { } block adds it to CI.
+// ============================================================================
+fun KotlinTarget.ciPlatform(): String? =
+    when (platformType) {
+        KotlinPlatformType.common -> null
+        KotlinPlatformType.jvm -> "Jvm"
+        KotlinPlatformType.androidJvm -> "Android"
+        KotlinPlatformType.js -> "Js"
+        KotlinPlatformType.wasm -> "Wasm"
+        KotlinPlatformType.native ->
+            when ((this as KotlinNativeTarget).konanTarget.family) {
+                Family.ANDROID -> "AndroidNative"
+                Family.IOS -> "Ios"
+                Family.OSX -> "Macos"
+                Family.TVOS -> "Tvos"
+                Family.WATCHOS -> "Watchos"
+                Family.LINUX -> "Linux"
+                Family.MINGW -> "Windows"
+                else -> throw GradleException("Target '$name' has no CI platform aggregate.")
             }
+    }
+
+val ciPlatformExtraTasks =
+    mapOf(
+        "Js" to listOf("kotlinUpgradeYarnLock", "kotlinStoreYarnLock"),
+        "Wasm" to listOf("kotlinWasmUpgradeYarnLock", "kotlinWasmStoreYarnLock"),
+        "Ios" to listOf("assemble${frameworkName}XCFramework"),
+    )
+
+for (platform in listOf("Jvm", "Android", "AndroidNative", "Ios", "Macos", "Tvos", "Watchos", "Linux", "Windows", "Js", "Wasm")) {
+    tasks.register("ci$platform") {
+        group = "verification"
+        description = "Builds every $platform target output and runs every $platform test this host can execute."
+        dependsOn(ciPlatformExtraTasks[platform].orEmpty())
+        kotlin.targets.matching { it.ciPlatform() == platform }.configureEach {
+            dependsOnTargetOutputs(this)
+            dependsOnTargetTests(this)
         }
     }
 }
 
-tasks.register("printTargetTaskNames") {
-    doLast {
-        kotlin.targets.forEach { t ->
-            println("TARGET ${t.name} artifacts=${t.artifactsTaskName} compileAll=${t.compilations.map { it.compileAllTaskName }} compile=${t.compilations.map { it.compileKotlinTaskName }} exists=${t.compilations.map { tasks.findByName(it.compileAllTaskName) != null }} artExists=${tasks.findByName(t.artifactsTaskName) != null}")
-        }
-        println("ANDROID " + tasks.names.filter { it.contains("ndroid") && !it.contains("Native") }.sorted())
-    }
+tasks.register("ciSwift") {
+    group = "verification"
+    description = "Builds the Swift Export package and runs swift test against it."
+    dependsOn("swiftExportSmokeTest")
 }
