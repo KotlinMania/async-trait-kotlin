@@ -25,9 +25,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test tvOS targets
-        # Every tvOS output and runnable test is wired in build.gradle.kts as ciTvos.
-        run: ./gradlew ciTvos --no-configuration-cache
+      - name: Build tvOS targets
+        # build.gradle.kts defines buildTvos: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildTvos --no-configuration-cache
+
+      - name: Test tvOS targets
+        # build.gradle.kts defines testTvos: every test this runner can execute.
+        run: ./gradlew testTvos --no-configuration-cache
 
       - name: Upload test reports (tvOS)
         if: success() || failure()

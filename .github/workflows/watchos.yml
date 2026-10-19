@@ -25,9 +25,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test watchOS targets
-        # Every watchOS output and runnable test is wired in build.gradle.kts as ciWatchos.
-        run: ./gradlew ciWatchos --no-configuration-cache
+      - name: Build watchOS targets
+        # build.gradle.kts defines buildWatchos: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildWatchos --no-configuration-cache
+
+      - name: Test watchOS targets
+        # build.gradle.kts defines testWatchos: every test this runner can execute.
+        run: ./gradlew testWatchos --no-configuration-cache
 
       - name: Upload test reports (watchOS)
         if: success() || failure()

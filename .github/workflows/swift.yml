@@ -49,11 +49,11 @@ jobs:
           swift --version
           xcodebuild -version
 
-      # swiftExportSmokeTest supplies the Xcode environment that
-      # embedSwiftExportForXcode reads, builds the package into build/swift-test/,
-      # and runs swift test in swift-test-harness/. ciSwift invokes it.
+      # swiftExportSmokeTest (build.gradle.kts) supplies the Xcode environment
+      # that embedSwiftExportForXcode reads, builds the package into
+      # build/swift-test/, and runs swift test in swift-test-harness/.
       - name: Build Swift Export package and run swift test
-        run: ./gradlew ciSwift --no-configuration-cache
+        run: ./gradlew swiftExportSmokeTest --no-configuration-cache
 
       - name: Upload Swift Export artifacts
         if: success() || failure()

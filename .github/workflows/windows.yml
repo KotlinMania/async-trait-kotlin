@@ -27,9 +27,13 @@ jobs:
         with:
           cache-provider: basic
 
-      - name: Build and test Windows targets
-        # Every Windows output and runnable test is wired in build.gradle.kts as ciWindows.
-        run: ./gradlew ciWindows --no-configuration-cache
+      - name: Build Windows targets
+        # build.gradle.kts defines buildWindows: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildWindows --no-configuration-cache
+
+      - name: Test Windows targets
+        # build.gradle.kts defines testWindows: every test this runner can execute.
+        run: ./gradlew testWindows --no-configuration-cache
 
       - name: Upload test reports (Windows)
         if: success() || failure()

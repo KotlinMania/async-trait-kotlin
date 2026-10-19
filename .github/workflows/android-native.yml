@@ -25,6 +25,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test Android Native targets
-        # Every Android Native output and runnable test is wired in build.gradle.kts as ciAndroidNative.
-        run: ./gradlew ciAndroidNative --no-configuration-cache
+      - name: Build Android Native targets
+        # build.gradle.kts defines buildAndroidNative: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildAndroidNative --no-configuration-cache
+
+      - name: Test Android Native targets
+        # build.gradle.kts defines testAndroidNative: every test this runner can execute.
+        run: ./gradlew testAndroidNative --no-configuration-cache

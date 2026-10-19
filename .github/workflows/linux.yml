@@ -25,9 +25,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test Linux targets
-        # Every Linux output and runnable test is wired in build.gradle.kts as ciLinux.
-        run: ./gradlew ciLinux --no-configuration-cache
+      - name: Build Linux targets
+        # build.gradle.kts defines buildLinux: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildLinux --no-configuration-cache
+
+      - name: Test Linux targets
+        # build.gradle.kts defines testLinux: every test this runner can execute.
+        run: ./gradlew testLinux --no-configuration-cache
 
       - name: Upload test reports (Linux)
         if: success() || failure()

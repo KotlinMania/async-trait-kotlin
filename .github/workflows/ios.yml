@@ -25,9 +25,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test iOS targets
-        # Every iOS output and runnable test is wired in build.gradle.kts as ciIos.
-        run: ./gradlew ciIos --no-configuration-cache
+      - name: Build iOS targets
+        # build.gradle.kts defines buildIos: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildIos --no-configuration-cache
+
+      - name: Test iOS targets
+        # build.gradle.kts defines testIos: every test this runner can execute.
+        run: ./gradlew testIos --no-configuration-cache
 
       # Native upload-artifact (GitHub-published) makes the test reports
       # downloadable from the run summary page. `if: success() || failure()`

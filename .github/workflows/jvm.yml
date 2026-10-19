@@ -25,9 +25,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test JVM targets
-        # Every JVM output and runnable test is wired in build.gradle.kts as ciJvm.
-        run: ./gradlew ciJvm --no-configuration-cache
+      - name: Build JVM targets
+        # build.gradle.kts defines buildJvm: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildJvm --no-configuration-cache
+
+      - name: Test JVM targets
+        # build.gradle.kts defines testJvm: every test this runner can execute.
+        run: ./gradlew testJvm --no-configuration-cache
 
       - name: Upload test reports (JVM)
         if: success() || failure()

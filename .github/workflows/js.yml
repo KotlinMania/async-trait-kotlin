@@ -42,11 +42,17 @@ jobs:
           npm --version
           yarn --version
 
-      - name: Build and test JS targets
+      - name: Build JS targets
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        # Every JS output and runnable test is wired in build.gradle.kts as ciJs.
-        run: ./gradlew ciJs --no-configuration-cache
+        # build.gradle.kts defines buildJs: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildJs --no-configuration-cache
+
+      - name: Test JS targets
+        env:
+          ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
+        # build.gradle.kts defines testJs: every test this runner can execute.
+        run: ./gradlew testJs --no-configuration-cache
 
       - name: Upload test reports (JS)
         if: success() || failure()

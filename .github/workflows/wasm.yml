@@ -42,7 +42,13 @@ jobs:
           npm --version
           yarn --version
 
-      - name: Build and test WASM targets
+      - name: Build WASM targets
+        env:
+          ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
+        # build.gradle.kts defines buildWasm: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildWasm --no-configuration-cache
+
+      - name: Test WASM targets
         # wasmJs runs under both Chrome (browser) and Node; wasmWasi runs
         # under Node with the wasi-preview1 shim. The generated
         # wasmWasiNodeTest runner calls `wasi.finalizeBindings(...)` which
@@ -50,8 +56,8 @@ jobs:
         # `kotlinWasmNodeJsSpec` to 24.15.0 (Active LTS "Krypton").
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        # Every WASM output and runnable test is wired in build.gradle.kts as ciWasm.
-        run: ./gradlew ciWasm --no-configuration-cache
+        # build.gradle.kts defines testWasm: every test this runner can execute.
+        run: ./gradlew testWasm --no-configuration-cache
 
       - name: Upload test reports (WASM)
         if: success() || failure()

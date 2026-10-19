@@ -28,6 +28,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
-      - name: Build and test Android targets
-        # The task list lives in build.gradle.kts (ciAndroid); this step only invokes it.
-        run: ./gradlew ciAndroid --no-configuration-cache
+      - name: Build Android target
+        # android/build.gradle.kts: the AAR and the host and device test packages.
+        run: ./gradlew :android:build --no-configuration-cache
+
+      - name: Test Android target
+        # android/build.gradle.kts: host tests, then device tests on the managed emulator.
+        run: ./gradlew :android:test --no-configuration-cache
