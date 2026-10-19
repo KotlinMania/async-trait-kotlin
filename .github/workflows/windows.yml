@@ -27,11 +27,9 @@ jobs:
         with:
           cache-provider: basic
 
-      - name: Build and test Windows target
-        run: >
-          ./gradlew
-          mingwX64Test
-          --no-configuration-cache
+      - name: Build and test Windows targets
+        # Every Windows output and runnable test is wired in build.gradle.kts as ciWindows.
+        run: ./gradlew ciWindows --no-configuration-cache
 
       - name: Upload test reports (Windows)
         if: success() || failure()

@@ -26,12 +26,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build and test tvOS targets
-        run: >
-          ./gradlew
-          compileKotlinTvosArm64
-          compileKotlinTvosSimulatorArm64
-          tvosSimulatorArm64Test
-          --no-configuration-cache
+        # Every tvOS output and runnable test is wired in build.gradle.kts as ciTvos.
+        run: ./gradlew ciTvos --no-configuration-cache
 
       - name: Upload test reports (tvOS)
         if: success() || failure()

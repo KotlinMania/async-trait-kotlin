@@ -26,11 +26,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build and test macOS targets
-        run: >
-          ./gradlew
-          compileKotlinMacosArm64
-          macosArm64Test
-          --no-configuration-cache
+        # Every macOS output and runnable test is wired in build.gradle.kts as ciMacos.
+        run: ./gradlew ciMacos --no-configuration-cache
 
       - name: Upload test reports (macOS)
         if: success() || failure()

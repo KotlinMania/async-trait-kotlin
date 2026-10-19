@@ -26,12 +26,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build and test watchOS targets
-        run: >
-          ./gradlew
-          compileKotlinWatchosDeviceArm64
-          compileKotlinWatchosSimulatorArm64
-          watchosSimulatorArm64Test
-          --no-configuration-cache
+        # Every watchOS output and runnable test is wired in build.gradle.kts as ciWatchos.
+        run: ./gradlew ciWatchos --no-configuration-cache
 
       - name: Upload test reports (watchOS)
         if: success() || failure()

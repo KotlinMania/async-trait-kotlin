@@ -29,11 +29,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build and test Android targets
-        run: >
-          ./gradlew
-          setupAndroidSdk
-          compileAndroidMain
-          assembleUnitTest
-          assembleAndroidTest
-          testAndroidHostTest
-          --no-configuration-cache
+        # The task list lives in build.gradle.kts (ciAndroid); this step only invokes it.
+        run: ./gradlew ciAndroid --no-configuration-cache

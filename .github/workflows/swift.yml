@@ -49,47 +49,11 @@ jobs:
           swift --version
           xcodebuild -version
 
-      # `embedSwiftExportForXcode` is the entry point for Kotlin's Swift
-      # Export pipeline. Outside an `xcodebuild`-driven invocation, the
-      # plugin's `BuildSPMSwiftExportPackage` task fails its property
-      # validation because the environment variables Xcode normally injects
-      # aren't present. The variables below cover what the plugin reads:
-      #
-      #   * SDK_NAME / ARCHS / CONFIGURATION — which slice to build.
-      #   * BUILT_PRODUCTS_DIR / TARGET_BUILD_DIR — where to land the static
-      #     archive and `.swiftmodule` bundles.
-      #   * FRAMEWORKS_FOLDER_PATH — relative path inside BUILT_PRODUCTS_DIR
-      #     where embedded frameworks would land.
-      #   * MACOSX_DEPLOYMENT_TARGET — the minimum macOS version.
-      #   * DEPLOYMENT_TARGET_SETTING_NAME — the indirection variable
-      #     telling the plugin which deployment-target env var to read.
-      #     Xcode sets this automatically per-target; outside Xcode it
-      #     must be set explicitly or the task fails with
-      #     `property 'deploymentTargetSettingName' doesn't have a
-      #     configured value`.
-      #
-      # Output lands in `build/swift-test/`:
-      #   * `lib<Module>.a` — the merged static archive containing every
-      #     `@ExportedBridge`-annotated function emitted by
-      #     `build/SwiftExport/macosArm64/Debug/**/*.kt`. `<Module>` is the
-      #     repo's `project.frameworkName` (the Swift Export module name).
-      #   * Four `.swiftmodule/` directories: <Module>,
-      #     KotlinRuntimeSupport, ExportedKotlinPackages, KotlinRuntime.
-      - name: Build Swift Export package
-        env:
-          BUILT_PRODUCTS_DIR: ${{ github.workspace }}/build/swift-test
-          TARGET_BUILD_DIR: ${{ github.workspace }}/build/swift-test
-          SDK_NAME: macosx
-          CONFIGURATION: Debug
-          ARCHS: arm64
-          FRAMEWORKS_FOLDER_PATH: Frameworks
-          MACOSX_DEPLOYMENT_TARGET: "15.0"
-          DEPLOYMENT_TARGET_SETTING_NAME: MACOSX_DEPLOYMENT_TARGET
-        run: ./gradlew embedSwiftExportForXcode --no-configuration-cache
-
-      - name: Run swift test against Kotlin-exported module
-        working-directory: swift-test-harness
-        run: swift test
+      # swiftExportSmokeTest supplies the Xcode environment that
+      # embedSwiftExportForXcode reads, builds the package into build/swift-test/,
+      # and runs swift test in swift-test-harness/. ciSwift invokes it.
+      - name: Build Swift Export package and run swift test
+        run: ./gradlew ciSwift --no-configuration-cache
 
       - name: Upload Swift Export artifacts
         if: success() || failure()

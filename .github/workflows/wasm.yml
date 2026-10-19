@@ -50,12 +50,8 @@ jobs:
         # `kotlinWasmNodeJsSpec` to 24.15.0 (Active LTS "Krypton").
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        run: >
-          ./gradlew
-          wasmJsBrowserTest
-          wasmJsNodeTest
-          wasmWasiNodeTest
-          --no-configuration-cache
+        # Every WASM output and runnable test is wired in build.gradle.kts as ciWasm.
+        run: ./gradlew ciWasm --no-configuration-cache
 
       - name: Upload test reports (WASM)
         if: success() || failure()

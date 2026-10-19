@@ -45,11 +45,8 @@ jobs:
       - name: Build and test JS targets
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        run: >
-          ./gradlew
-          jsBrowserTest
-          jsNodeTest
-          --no-configuration-cache
+        # Every JS output and runnable test is wired in build.gradle.kts as ciJs.
+        run: ./gradlew ciJs --no-configuration-cache
 
       - name: Upload test reports (JS)
         if: success() || failure()
