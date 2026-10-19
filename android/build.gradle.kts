@@ -1,4 +1,10 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import org.gradle.api.GradleException
+import org.gradle.api.attributes.Attribute
+import org.gradle.api.attributes.AttributeContainer
+import org.gradle.api.publish.maven.tasks.AbstractPublishToMaven
+import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
@@ -11,7 +17,6 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.zip.ZipInputStream
-import kotlin.jvm.optionals.getOrNull
 
 // ============================================================================
 // Android build
@@ -32,6 +37,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.android.kotlin.multiplatform.library")
     id("org.jlleitschuh.gradle.ktlint")
+    `java-base`
+    `maven-publish`
+    signing
 }
 
 group = providers.gradleProperty("project.group").getOrElse("io.github.kotlinmania")
@@ -43,23 +51,6 @@ val jvmToolchainVersion =
         .toInt()
 val rootSources = rootProject.layout.projectDirectory.dir("src")
 val managedDeviceName = "pixel6"
-
-// Dependencies come from the same catalog bundles as the root build: the
-// commonMain bundle, and <prefix>-<sourceSetName> for every other source set
-// the catalog defines a bundle for.
-val libsCatalog = versionCatalogs.named("libs")
-val commonMainBundleName = providers.gradleProperty("project.dependencies.commonMainBundle").get()
-val dependencyBundlePrefix =
-    providers
-        .gradleProperty("project.dependencies.bundlePrefix")
-        .map { it.trim() }
-        .orNull
-        ?.takeIf { it.isNotEmpty() }
-        ?: commonMainBundleName.removeSuffix("-commonMain")
-
-fun libsBundle(bundleName: String) =
-    libsCatalog.findBundle(bundleName).getOrNull()
-        ?: throw GradleException("Missing libs bundle '$bundleName'")
 
 val commonOptIns =
     providers
@@ -260,7 +251,7 @@ val ensureAndroidSdk =
     tasks.register("ensureAndroidSdk") {
         group = "setup"
         description = "Ensures the project-local Android SDK is installed (idempotent)."
-        onlyIf("Android SDK already installed at $projectAndroidSdkDir") { !isProjectAndroidSdkInstalled() }
+        onlyIf { !isProjectAndroidSdkInstalled() }
         doLast {
             installProjectAndroidSdk(serviceOf())
         }
@@ -309,6 +300,8 @@ kotlin {
         withHostTestBuilder { sourceSetTreeName = "test" }.configure {}
         withDeviceTestBuilder { sourceSetTreeName = "test" }.configure {
             instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            // The managed-device API is incubating in the Android Gradle Plugin;
+            // it is the only way the build provisions its own emulator.
             // A Gradle-managed emulator: the build downloads the system image,
             // boots the device headless, runs the tests, and shuts it down.
             managedDevices {
@@ -329,7 +322,7 @@ kotlin {
             kotlin.srcDir(rootSources.dir("commonMain/kotlin"))
             resources.srcDir(rootSources.dir("commonMain/resources"))
             dependencies {
-                implementation(libsBundle(commonMainBundleName))
+                implementation(libs.bundles.common.main)
             }
         }
         commonTest {
@@ -337,15 +330,11 @@ kotlin {
             resources.srcDir(rootSources.dir("commonTest/resources"))
             dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.bundles.common.test)
             }
         }
-        configureEach {
-            val sourceSetName = name
-            if (sourceSetName != "commonMain") {
-                libsCatalog.findBundle("$dependencyBundlePrefix-$sourceSetName").getOrNull()?.let { bundle ->
-                    dependencies { implementation(bundle) }
-                }
-            }
+        getByName("androidDeviceTest").dependencies {
+            implementation(libs.bundles.android.device.test)
         }
     }
 }
@@ -355,6 +344,158 @@ ktlint {
     android.set(true)
     outputToConsole.set(true)
     ignoreFailures.set(false)
+}
+
+// ============================================================================
+// IDE dependency views
+// ----------------------------------------------------------------------------
+// IntelliJ's Gradle tool window lists dependencies per Java source set: each
+// one's compile and runtime classpath. The Kotlin plugin registers Java source
+// sets only for jvm(). Every Kotlin source set gets a view here, so the tree
+// shows dependencies by platform and by every shared source set (commonMain,
+// nativeMain, appleMain, iosMain, webMain, browserMain, posixMain, ...):
+//
+//   <sourceSet>DependenciesCompileClasspath  what the source set compiles against
+//   <sourceSet>DependenciesRuntimeClasspath  what it runs with
+//
+// A platform source set mirrors its compilation's classpaths; a shared source
+// set mirrors its metadata compilation. Each view extends the classpath it
+// mirrors and carries its attributes, so it resolves exactly the same graph.
+// ============================================================================
+fun <T : Any> copyAttribute(
+    key: Attribute<T>,
+    from: AttributeContainer,
+    to: AttributeContainer,
+) {
+    from.getAttribute(key)?.let { to.attribute(key, it) }
+}
+
+fun Configuration.mirror(source: Configuration) {
+    extendsFrom(source)
+    source.attributes.keySet().forEach { copyAttribute(it, source.attributes, attributes) }
+}
+
+val javaSourceSets = extensions.getByType<JavaPluginExtension>().sourceSets
+
+fun registerDependencyView(
+    sourceSetName: String,
+    compileClasspathName: String,
+    runtimeClasspathName: String,
+) {
+    val view = javaSourceSets.maybeCreate("${sourceSetName}Dependencies")
+    configurations.named(view.compileClasspathConfigurationName) { mirror(configurations.getByName(compileClasspathName)) }
+    configurations.named(view.runtimeClasspathConfigurationName) { mirror(configurations.getByName(runtimeClasspathName)) }
+}
+
+kotlin.targets.configureEach {
+    compilations.configureEach {
+        val compileClasspathName = compileDependencyConfigurationName
+        registerDependencyView(
+            defaultSourceSet.name,
+            compileClasspathName,
+            runtimeDependencyConfigurationName ?: compileClasspathName,
+        )
+    }
+}
+
+// ============================================================================
+// Publishing
+// ----------------------------------------------------------------------------
+// Android ships as <project.name>-android, signed and staged into the root
+// build's Central Portal staging directory, so it goes out in the same
+// deployment bundle as every other platform. The root module's Gradle metadata
+// lists these variants (see the root build), so Android consumers of the
+// library's coordinates resolve this AAR. This project's own multiplatform root
+// module is not published; the root project's is the library's.
+// ============================================================================
+val publishProjectName = providers.gradleProperty("project.name").getOrElse("unnamed-project")
+val androidArtifactId = "$publishProjectName-android"
+
+val emptyJavadocJar =
+    tasks.register<Jar>("emptyJavadocJar") {
+        archiveClassifier.set("javadoc")
+    }
+
+publishing {
+    publications.withType<MavenPublication>().configureEach {
+        if (name == "android") artifactId = androidArtifactId
+        artifact(emptyJavadocJar)
+        pom {
+            name.set(androidArtifactId)
+            description.set(providers.gradleProperty("project.pom.description").getOrElse(""))
+            inceptionYear.set("2026")
+            url.set("https://github.com/KotlinMania/$publishProjectName")
+            licenses {
+                license {
+                    name.set(providers.gradleProperty("project.pom.licenseName").getOrElse("MIT"))
+                    url.set(
+                        providers
+                            .gradleProperty("project.pom.licenseUrl")
+                            .getOrElse("https://opensource.org/licenses/MIT"),
+                    )
+                    distribution.set("repo")
+                }
+            }
+            developers {
+                developer {
+                    id.set("sydneyrenee")
+                    name.set("Sydney Renee")
+                    email.set("sydney@solace.ofharmony.ai")
+                    url.set("https://github.com/sydneyrenee")
+                }
+            }
+            scm {
+                url.set("https://github.com/KotlinMania/$publishProjectName")
+                connection.set("scm:git:git://github.com/KotlinMania/$publishProjectName.git")
+                developerConnection.set("scm:git:ssh://github.com/KotlinMania/$publishProjectName.git")
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "centralPortalStaging"
+            url = uri(rootProject.layout.buildDirectory.dir("staging-deploy"))
+        }
+    }
+}
+
+tasks.withType<AbstractPublishToMaven>().configureEach {
+    if (publication.name == "kotlinMultiplatform") enabled = false
+}
+
+// The Android module points back at the library's root module, not at this
+// project's.
+tasks.named<GenerateModuleMetadata>("generateMetadataFileForAndroidPublication") {
+    val rootModule = publishProjectName
+    val rootGroup = project.group.toString()
+    val rootVersion = project.version.toString()
+    doLast {
+        val moduleFile = outputFile.get().asFile
+        val module = JsonSlurper().parse(moduleFile) as Map<*, *>
+        val rewritten =
+            module.entries.associate { (it.key as String) to it.value } +
+                (
+                    "component" to
+                        mapOf(
+                            "url" to "../../$rootModule/$rootVersion/$rootModule-$rootVersion.module",
+                            "group" to rootGroup,
+                            "module" to rootModule,
+                            "version" to rootVersion,
+                        )
+                )
+        moduleFile.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(rewritten)))
+    }
+}
+
+signing {
+    val signingKey = providers.gradleProperty("signingInMemoryKey").orNull
+    val signingKeyId = providers.gradleProperty("signingInMemoryKeyId").orNull
+    val signingPassword = providers.gradleProperty("signingInMemoryKeyPassword").orNull
+    val signingEnabled = project.findProperty("RELEASE_SIGNING_ENABLED") != "false" && signingKey != null
+    if (signingEnabled) {
+        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+        sign(publishing.publications)
+    }
 }
 
 // ============================================================================

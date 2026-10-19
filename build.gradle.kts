@@ -1,7 +1,11 @@
+import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.gradle.api.GradleException
+import org.gradle.api.attributes.Attribute
+import org.gradle.api.attributes.AttributeContainer
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
+import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
@@ -11,6 +15,7 @@ import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.plugin.ExecutionTaskHolder
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import org.jetbrains.kotlin.gradle.plugin.KotlinTargetWithTests
@@ -23,26 +28,19 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 import org.jetbrains.kotlin.konan.target.Family
-import java.io.ByteArrayInputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.Base64
 import java.util.UUID
-import java.util.zip.ZipInputStream
-import kotlin.jvm.optionals.getOrNull
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.android.kmp)
+    alias(libs.plugins.android.kmp) apply false
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
-    alias(libs.plugins.kotlinx.benchmark)
-    alias(libs.plugins.kotlin.allopen)
     `maven-publish`
     signing
 }
@@ -51,15 +49,7 @@ group = providers.gradleProperty("project.group").getOrElse("io.github.kotlinman
 version = providers.gradleProperty("project.version").getOrElse("0.1.0-SNAPSHOT")
 val frameworkName = providers.gradleProperty("project.frameworkName").getOrElse("Unnamed")
 val projectNamespace = providers.gradleProperty("project.namespace").getOrElse("io.github.kotlinmania")
-val kotlinVersion = providers.gradleProperty("versions.kotlin").getOrElse("2.4.0")
-val commonMainBundleName = providers.gradleProperty("project.dependencies.commonMainBundle").get()
-val libsCatalog = versionCatalogs.named("libs")
-
-fun libsBundle(bundleName: String) =
-    libsCatalog.findBundle(bundleName).getOrNull()
-        ?: throw GradleException("Missing libs bundle '$bundleName'")
-
-val commonMainDependencyBundle = libsBundle(commonMainBundleName)
+val kotlinVersion = libs.versions.kotlin.get()
 
 fun csvProperty(name: String): Set<String> =
     providers
@@ -72,49 +62,8 @@ fun csvProperty(name: String): Set<String> =
                 .toSet()
         }.getOrElse(emptySet())
 
-fun optionalTrimmedProperty(name: String): String? =
-    providers
-        .gradleProperty(name)
-        .map { it.trim() }
-        .orNull
-        ?.takeIf { it.isNotEmpty() }
-
-val enabledFeatureNames = csvProperty("project.features")
-val benchmarkEnabled = "benchmark" in enabledFeatureNames
-val benchmarkTargetNames = csvProperty("project.benchmark.targets")
-val commonBenchmarkBundleName = optionalTrimmedProperty("project.dependencies.commonBenchmarkBundle")
-val commonBenchmarkDependencyBundle =
-    commonBenchmarkBundleName?.let(::libsBundle)
-
-// Dependencies reach every source set, not only commonMain. A source set takes
-// the catalog bundle named <prefix>-<sourceSetName> whenever the catalog defines
-// one (async-trait-commonMain, async-trait-jsMain, async-trait-nodeMain,
-// async-trait-wasmJsMain, async-trait-jvmMain, async-trait-androidMain,
-// async-trait-appleMain, async-trait-nativeMain, and their Test counterparts),
-// and the npm packages listed in project.npm.<sourceSetName> as comma-separated
-// name@version entries. The prefix defaults to the commonMain bundle name with
-// its -commonMain suffix removed.
-val dependencyBundlePrefix =
-    optionalTrimmedProperty("project.dependencies.bundlePrefix")
-        ?: commonMainBundleName.removeSuffix("-commonMain")
-
-fun npmPackages(sourceSetName: String): List<Pair<String, String>> =
-    csvProperty("project.npm.$sourceSetName").map { spec ->
-        val separator = spec.lastIndexOf('@')
-        if (separator <= 0) {
-            throw GradleException("project.npm.$sourceSetName entry '$spec' must be name@version")
-        }
-        spec.substring(0, separator) to spec.substring(separator + 1)
-    }
-if (benchmarkEnabled && commonBenchmarkDependencyBundle == null) {
-    throw GradleException("Feature 'benchmark' requires project.dependencies.commonBenchmarkBundle")
-}
-val benchmarkWarmups = providers.gradleProperty("project.benchmark.warmups").map { it.toInt() }.getOrElse(3)
-val benchmarkIterations = providers.gradleProperty("project.benchmark.iterations").map { it.toInt() }.getOrElse(5)
-val benchmarkIterationTime = providers.gradleProperty("project.benchmark.iterationTime").map { it.toLong() }.getOrElse(1L)
-val benchmarkIterationTimeUnit = providers.gradleProperty("project.benchmark.iterationTimeUnit").getOrElse("s")
 val intellijCoroutinesVersion =
-    providers.gradleProperty("versions.intellij.coroutines").getOrElse("1.10.2-intellij-1")
+    libs.versions.intellijCoroutines.get()
 
 // KGP runs Swift Export in an isolated worker whose classpath is
 // `swiftExportClasspath`. Adding a dependency disables KGP's default
@@ -129,228 +78,12 @@ configurations.configureEach {
             ),
         )
     }
-    if (name.contains("androidDeviceTest", ignoreCase = true)) {
-        exclude(group = "org.jetbrains", module = "annotations")
-    }
 }
 
 // Opt-ins shared across Kotlin targets.
-val commonOptIns =
-    listOf(
-        "kotlin.time.ExperimentalTime",
-        "kotlin.concurrent.atomics.ExperimentalAtomicApi",
-        "kotlin.ExperimentalUnsignedTypes",
-    )
-
-// ============================================================================
-// Android SDK installer
-// ----------------------------------------------------------------------------
-// The Android Gradle Plugin resolves the SDK location at configuration time,
-// so the SDK must already be on disk before the `kotlin { android { ... } }`
-// block evaluates. The installer is idempotent — a .install-complete marker
-// short-circuits the download on every subsequent invocation, so warm runs
-// pay only a directory-existence check. CI runners pay a one-time cold cost
-// the first time they touch the project.
-// ============================================================================
-
-val androidCommandLineToolsRevision =
-    providers
-        .gradleProperty(
-            "android.commandLineTools.revision",
-        ).getOrElse("14742923")
-val projectCompileSdk = providers.gradleProperty("android.compileSdk").getOrElse("34")
-val projectAndroidBuildTools = providers.gradleProperty("android.buildTools").getOrElse("36.0.0")
-val osName = providers.systemProperty("os.name").get().lowercase()
-val isWindowsHost = "windows" in osName
-val isMacHost = "mac" in osName
-val androidSdkOsName =
-    when {
-        isWindowsHost -> "win"
-        isMacHost -> "mac"
-        "linux" in osName -> "linux"
-        else -> throw GradleException("Unsupported Android SDK setup OS: ${providers.systemProperty("os.name").get()}")
-    }
-val projectAndroidSdkDir = layout.projectDirectory.dir(".android-sdk").asFile
-val androidSdkManager =
-    projectAndroidSdkDir.resolve(
-        if (isWindowsHost) {
-            "cmdline-tools/latest/bin/sdkmanager.bat"
-        } else {
-            "cmdline-tools/latest/bin/sdkmanager"
-        },
-    )
-val androidSdkInstallMarker = projectAndroidSdkDir.resolve(".install-complete")
-val requiredAndroidSdkPackageDirs =
-    listOf(
-        projectAndroidSdkDir.resolve("platform-tools"),
-        projectAndroidSdkDir.resolve("platforms/android-$projectCompileSdk"),
-        projectAndroidSdkDir.resolve("build-tools/$projectAndroidBuildTools"),
-    )
-
-fun writeAndroidLocalProperties() {
-    projectAndroidSdkDir.mkdirs()
-    val sdkDirPropertyValue = projectAndroidSdkDir.absolutePath.replace("\\", "/")
-    layout.projectDirectory
-        .file("local.properties")
-        .asFile
-        .writeText("sdk.dir=$sdkDirPropertyValue\n")
-}
-
-fun isProjectAndroidSdkInstalled(): Boolean =
-    androidSdkInstallMarker.exists() &&
-        androidSdkManager.exists() &&
-        requiredAndroidSdkPackageDirs.all { it.exists() }
-
-fun sdkManagerCommand(vararg args: String): List<String> =
-    if (isWindowsHost) {
-        listOf("cmd", "/c", androidSdkManager.absolutePath) + args
-    } else {
-        listOf(androidSdkManager.absolutePath) + args
-    }
-
-fun downloadAndroidCommandLineTools() {
-    val zipName = "commandlinetools-$androidSdkOsName-${androidCommandLineToolsRevision}_latest.zip"
-    val url = "https://dl.google.com/android/repository/$zipName"
-    val tmpDir = projectAndroidSdkDir.resolve(".tmp/commandline-tools")
-    val zipFile = tmpDir.resolve(zipName)
-    val latestDir = projectAndroidSdkDir.resolve("cmdline-tools/latest")
-    println("setup-android-sdk: downloading $url")
-    tmpDir.deleteRecursively()
-    tmpDir.mkdirs()
-    try {
-        URI(url).toURL().openStream().use { input ->
-            Files.copy(input, zipFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
-        latestDir.deleteRecursively()
-        latestDir.mkdirs()
-        val canonicalLatestDir = latestDir.canonicalFile.toPath()
-        ZipInputStream(zipFile.inputStream().buffered()).use { zipInput ->
-            generateSequence { zipInput.nextEntry }.forEach { entry ->
-                val relativeName = entry.name.removePrefix("cmdline-tools/").trimStart('/')
-                if (relativeName.isNotEmpty()) {
-                    val target = latestDir.resolve(relativeName).canonicalFile
-                    if (!target.toPath().startsWith(canonicalLatestDir)) {
-                        throw GradleException("Refusing to extract Android SDK entry outside $latestDir: ${entry.name}")
-                    }
-                    if (entry.isDirectory) {
-                        target.mkdirs()
-                    } else {
-                        target.parentFile.mkdirs()
-                        Files.copy(zipInput, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                        if (!isWindowsHost && relativeName.startsWith("bin/")) target.setExecutable(true)
-                    }
-                }
-                zipInput.closeEntry()
-            }
-        }
-        if (!isWindowsHost) androidSdkManager.setExecutable(true)
-    } finally {
-        tmpDir.deleteRecursively()
-    }
-}
-
-fun installProjectAndroidSdk(execOperations: ExecOperations) {
-    if (isProjectAndroidSdkInstalled()) {
-        writeAndroidLocalProperties()
-        println("setup-android-sdk: SDK already installed at $projectAndroidSdkDir")
-        return
-    }
-    if (!androidSdkManager.exists()) downloadAndroidCommandLineTools()
-    println("setup-android-sdk: accepting licenses")
-    val licenseAnswers = "y\n".repeat(200).toByteArray(Charsets.UTF_8)
-    val licenseResult =
-        execOperations.exec {
-            commandLine(sdkManagerCommand("--sdk_root=${projectAndroidSdkDir.absolutePath}", "--licenses"))
-            standardInput = ByteArrayInputStream(licenseAnswers)
-            isIgnoreExitValue = true
-        }
-    if (licenseResult.exitValue != 0) {
-        throw GradleException("Android SDK license acceptance failed with exit code ${licenseResult.exitValue}")
-    }
-    println(
-        "setup-android-sdk: installing platform-tools, android-$projectCompileSdk, build-tools;$projectAndroidBuildTools",
-    )
-    val installLog = projectAndroidSdkDir.resolve("sdkmanager-install.log")
-    installLog.parentFile.mkdirs()
-    installLog.outputStream().use { output ->
-        val installResult =
-            execOperations.exec {
-                commandLine(
-                    sdkManagerCommand(
-                        "--sdk_root=${projectAndroidSdkDir.absolutePath}",
-                        "platform-tools",
-                        "platforms;android-$projectCompileSdk",
-                        "build-tools;$projectAndroidBuildTools",
-                    ),
-                )
-                standardOutput = output
-                errorOutput = output
-                isIgnoreExitValue = true
-            }
-        if (installResult.exitValue != 0) {
-            throw GradleException(
-                "Android SDK package install failed with exit code ${installResult.exitValue}. " +
-                    "Install log:\n${installLog.readText()}",
-            )
-        }
-    }
-    writeAndroidLocalProperties()
-    androidSdkInstallMarker.writeText("")
-    println("setup-android-sdk: done; SDK at $projectAndroidSdkDir")
-}
-
-// ----------------------------------------------------------------------------
-// Android SDK setup is gated to follow the requested task. It must never run for
-// non-Android invocations (jsTest, jvmTest, swiftExportSmokeTest, native /
-// androidNative links) -- an unconditional install here is what made the SDK
-// download appear on every machine and target.
-//
-// `writeAndroidLocalProperties()` always runs: it is cheap, hits no network, and
-// only points local.properties at the project-local .android-sdk so AGP can
-// resolve `sdk.dir` while the `androidLibrary {}` block evaluates.
-//
-// The SDK *package* download must happen at configuration time when -- and only
-// when -- an Android task is in the requested build. AGP validates the packages
-// while determining the dependencies of `compileAndroidMain` (task-graph
-// construction, strictly before any task executes), so a plain `dependsOn`
-// cannot supply them in time. We detect Android intent from the requested task
-// names and install eagerly in that case. androidNative* are Kotlin/Native
-// targets and need no Android SDK.
-// ----------------------------------------------------------------------------
-writeAndroidLocalProperties()
-
-fun requestedTaskWantsAndroid(rawTaskName: String): Boolean {
-    val taskName = rawTaskName.substringAfterLast(':')
-    if (taskName.contains("AndroidNative")) return false // Kotlin/Native, no SDK
-    if (taskName.contains("Android")) return true // direct AGP tasks
-    return taskName in setOf("build", "assemble", "check") // aggregates pull android
-}
-
-if (gradle.startParameter.taskNames.any(::requestedTaskWantsAndroid)) {
-    installProjectAndroidSdk(serviceOf())
-}
-
-val ensureAndroidSdk =
-    tasks.register("ensureAndroidSdk") {
-        group = "setup"
-        description = "Ensures the project-local Android SDK is installed (idempotent)."
-        onlyIf("Android SDK already installed at $projectAndroidSdkDir") { !isProjectAndroidSdkInstalled() }
-        doLast {
-            installProjectAndroidSdk(serviceOf())
-        }
-    }
-
-// Secondary net: order every AGP Android task after the installer (a no-op on
-// warm runs). Excludes androidNative* (Kotlin/Native) and the installer itself.
-tasks
-    .matching { task ->
-        val taskName = task.name
-        taskName != "ensureAndroidSdk" &&
-            taskName.contains("Android") &&
-            !taskName.contains("AndroidNative")
-    }.configureEach {
-        dependsOn(ensureAndroidSdk)
-    }
+// Read from gradle.properties so the android project compiles commonMain with
+// the same opt-ins.
+val commonOptIns = csvProperty("project.kotlin.optIns")
 
 // Gap #9b: KGP-generated bridge boilerplate and KotlinCoroutineSupport runtime
 // produce warnings (unchecked casts, unused expressions, opt-in requirements)
@@ -361,7 +94,10 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
     }
 }
 
-val jvmToolchainVersion = providers.gradleProperty("jvm.toolchain").getOrElse("21").toInt()
+val jvmToolchainVersion =
+    libs.versions.jvmToolchain
+        .get()
+        .toInt()
 
 // ============================================================================
 // kotlin { … }
@@ -399,56 +135,38 @@ kotlin {
         }
     }
 
-    fun KotlinTarget.configureBenchmarkCompilation() {
-        if (!benchmarkEnabled || name !in benchmarkTargetNames) return
-        val mainCompilation = compilations.getByName("main")
-        compilations.create("benchmark") {
-            associateWith(mainCompilation)
-            defaultSourceSet.dependencies {
-                implementation(commonBenchmarkDependencyBundle!!)
-            }
-        }
-    }
-
     // Apple — Tier 1/2 targets
     macosArm64 {
-        configureBenchmarkCompilation()
         addToXcf()
     }
     iosArm64 {
-        configureBenchmarkCompilation()
         addToXcf(static = true)
     }
     iosSimulatorArm64 {
-        configureBenchmarkCompilation()
         addToXcf(static = true)
     }
     tvosArm64 {
-        configureBenchmarkCompilation()
         addToXcf()
     }
     tvosSimulatorArm64 {
-        configureBenchmarkCompilation()
         addToXcf()
     }
     // watchosArm64 (WatchOS 32 / arm64_32): retired by workspace policy (§5.5.1). WatchOS 32 is not supported.
     watchosDeviceArm64 {
-        configureBenchmarkCompilation()
         addToXcf()
     }
     watchosSimulatorArm64 {
-        configureBenchmarkCompilation()
         addToXcf()
     }
 
     // Other native — Tier 1/2
-    linuxX64 { configureBenchmarkCompilation() }
-    linuxArm64 { configureBenchmarkCompilation() }
-    mingwX64 { configureBenchmarkCompilation() }
+    linuxX64()
+    linuxArm64()
+    mingwX64()
 
     // Android NDK — 64-bit only (32-bit retired §5.5.3, 2026-06-25).
-    androidNativeArm64 { configureBenchmarkCompilation() }
-    androidNativeX64 { configureBenchmarkCompilation() }
+    androidNativeArm64()
+    androidNativeX64()
 
     targets.withType<KotlinNativeTarget>().configureEach {
         binaries.staticLib {
@@ -461,7 +179,6 @@ kotlin {
 
     // Web
     js {
-        configureBenchmarkCompilation()
         browser()
         nodejs()
     }
@@ -469,14 +186,12 @@ kotlin {
     // wasmJs is Stable as of Kotlin 2.2; @OptIn may be removable — verify before dropping on wasmWasi.
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        configureBenchmarkCompilation()
         browser()
         nodejs()
     }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmWasi {
-        configureBenchmarkCompilation()
         nodejs()
     }
 
@@ -492,71 +207,23 @@ kotlin {
         }
     }
 
-    // Android KMP library. Block name is `android` — `androidLibrary` is deprecated in current KGP.
-    android {
-        namespace = projectNamespace
-        compileSdk = projectCompileSdk.toInt()
-        minSdk = providers.gradleProperty("android.minSdk").getOrElse("24").toInt()
-        withHostTestBuilder {}.configure {}
-        withDeviceTestBuilder { sourceSetTreeName = "test" }
-    }
-
     // JVM — jvmTarget derived from the same toolchain property so they can't drift.
     jvm {
-        configureBenchmarkCompilation()
         compilerOptions {
             jvmTarget.set(JvmTarget.fromTarget(jvmToolchainVersion.toString()))
         }
     }
 
+    // Dependencies are declared per source set from gradle/libs.versions.toml.
+    // A platform or shared source set (jsMain, appleMain, nativeMain, ...) gets
+    // its own block here when it needs dependencies of its own.
     sourceSets {
         commonMain.dependencies {
-            implementation(commonMainDependencyBundle)
+            implementation(libs.bundles.common.main)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-        }
-        configureEach {
-            val sourceSetName = name
-            val bundle =
-                if (sourceSetName == "commonMain") null else libsCatalog.findBundle("$dependencyBundlePrefix-$sourceSetName").getOrNull()
-            val packages = npmPackages(sourceSetName)
-            dependencies {
-                bundle?.let { implementation(it) }
-                packages.forEach { (packageName, packageVersion) -> implementation(npm(packageName, packageVersion)) }
-            }
-        }
-        if (benchmarkEnabled) {
-            val commonBenchmark = maybeCreate("commonBenchmark")
-            commonBenchmark.dependencies {
-                implementation(commonBenchmarkDependencyBundle!!)
-            }
-            benchmarkTargetNames.forEach { targetName ->
-                findByName("${targetName}Benchmark")?.dependsOn(commonBenchmark)
-            }
-        }
-    }
-}
-
-allOpen {
-    annotation("org.openjdk.jmh.annotations.State")
-    annotation("kotlinx.benchmark.State")
-}
-
-if (benchmarkEnabled) {
-    benchmark {
-        targets {
-            benchmarkTargetNames.forEach { targetName ->
-                register("${targetName}Benchmark")
-            }
-        }
-        configurations {
-            named("main") {
-                warmups = benchmarkWarmups
-                iterations = benchmarkIterations
-                iterationTime = benchmarkIterationTime
-                iterationTimeUnit = benchmarkIterationTimeUnit
-            }
+            implementation(libs.bundles.common.test)
         }
     }
 }
@@ -619,36 +286,40 @@ ktlint {
     }
 }
 
-if (benchmarkEnabled) {
-    tasks
-        .withType<dev.detekt.gradle.Detekt>()
-        .matching {
-            it.name.contains("BenchmarkBenchmark")
-        }.configureEach {
-            enabled = false
-        }
-
-    tasks
-        .matching {
-            it.name.startsWith("runKtlintCheckOver") && it.name.endsWith("BenchmarkBenchmarkSourceSet")
-        }.configureEach {
-            enabled = false
-        }
-}
-
+// check is static analysis. Tests are not part of build: they run through test
+// and test<Platform>.
 tasks.named("check") {
     dependsOn(tasks.withType<dev.detekt.gradle.Detekt>())
     dependsOn(tasks.named("ktlintCheck"))
-    dependsOn("test")
+}
+
+// The Kotlin and Android plugins attach every test run to check while they
+// finish configuring the project. Remove those edges once evaluation is done,
+// so check stays static analysis and build runs no tests; test runs them.
+fun Task.isTestRun(): Boolean = this is AbstractTestTask || name == "allTests" || name.startsWith("test")
+
+afterEvaluate {
+    tasks.named("check") {
+        setDependsOn(
+            dependsOn.filterNot { dependency ->
+                when (dependency) {
+                    is Task -> dependency.isTestRun()
+                    is TaskProvider<*> -> dependency.get().isTestRun()
+                    is String -> tasks.findByName(dependency.substringAfterLast(':'))?.isTestRun() == true
+                    else -> false
+                }
+            },
+        )
+    }
 }
 
 // ============================================================================
 // JS / Wasm toolchain pins
 // ============================================================================
-val nodeVersion = providers.gradleProperty("node.version").getOrElse("24.15.0")
-val wasmNodeVersion = providers.gradleProperty("wasm.node.version").getOrElse(nodeVersion)
-val yarnVersion = providers.gradleProperty("yarn.version").getOrElse("1.22.22")
-val wasmYarnVersion = providers.gradleProperty("wasm.yarn.version").getOrElse(yarnVersion)
+val nodeVersion = libs.versions.node.get()
+val wasmNodeVersion = nodeVersion
+val yarnVersion = libs.versions.yarn.get()
+val wasmYarnVersion = yarnVersion
 
 // webpack is pinned in kotlin-js-store/package.json — the single source of truth
 // that Dependabot updates natively. Gradle reads the version from there so the
@@ -700,11 +371,11 @@ val patchedKarmaWebpackPackage =
 //       NodeJsEnvSpec API gains equivalent properties. Track KGP release notes before removing.
 rootProject.extensions.configure<NodeJsRootExtension>("kotlinNodeJs") {
     versions.webpack.version = webpackVersion
-    versions.webpackCli.version = providers.gradleProperty("node.webpackCli.version").getOrElse("7.2.3")
-    versions.karma.version = providers.gradleProperty("node.karma.version").getOrElse("npm:karma-maintained@6.4.8")
+    versions.webpackCli.version = libs.versions.webpackCli.get()
+    versions.karma.version = libs.versions.karma.get()
     versions.karmaWebpack.version = "file:$patchedKarmaWebpackPackage"
-    versions.mocha.version = providers.gradleProperty("node.mocha.version").getOrElse("12.0.0-beta-10")
-    versions.kotlinWebHelpers.version = providers.gradleProperty("node.kotlinWebHelpers.version").getOrElse("3.1.0")
+    versions.mocha.version = libs.versions.mocha.get()
+    versions.kotlinWebHelpers.version = libs.versions.kotlinWebHelpers.get()
 }
 
 // Make kotlinUpgradeYarnLock and kotlinWasmUpgradeYarnLock dependencies in the build process
@@ -835,12 +506,51 @@ centralPortalPublishTasks.configureEach {
     dependsOn(tasks.withType<Sign>())
 }
 
+// The root module lists every platform's variants. Android builds and publishes
+// in the android project, so its variants are added here, each pointing at the
+// Android module, the same way the Kotlin plugin points at every other
+// platform's module.
+val androidModuleFile =
+    project(":android").layout.buildDirectory.file("publications/android/module.json")
+
+tasks.named<GenerateModuleMetadata>("generateMetadataFileForKotlinMultiplatformPublication") {
+    dependsOn(":android:generateMetadataFileForAndroidPublication")
+    inputs.file(androidModuleFile)
+    val androidModule = "$publishProjectName-android"
+    val libraryGroup = project.group.toString()
+    val libraryVersion = project.version.toString()
+    doLast {
+        val rootModuleFile = outputFile.get().asFile
+        val rootModule = JsonSlurper().parse(rootModuleFile) as Map<*, *>
+        val android = JsonSlurper().parse(androidModuleFile.get().asFile) as Map<*, *>
+        val androidVariants =
+            (android["variants"] as List<*>).map { variant ->
+                variant as Map<*, *>
+                mapOf(
+                    "name" to variant["name"],
+                    "attributes" to variant["attributes"],
+                    "available-at" to
+                        mapOf(
+                            "url" to "../../$androidModule/$libraryVersion/$androidModule-$libraryVersion.module",
+                            "group" to libraryGroup,
+                            "module" to androidModule,
+                            "version" to libraryVersion,
+                        ),
+                )
+            }
+        val variants = (rootModule["variants"] as List<*>) + androidVariants
+        val rewritten = rootModule.entries.associate { (it.key as String) to it.value } + ("variants" to variants)
+        rootModuleFile.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(rewritten)))
+    }
+}
+
 // Zip the staged Maven layout into a single Central Portal deployment bundle.
 val centralPortalBundle =
     tasks.register<Zip>("centralPortalBundle") {
         group = "publishing"
         description = "Bundles the staged Maven artifacts into a Central Portal deployment zip."
         dependsOn(centralPortalPublishTasks)
+        dependsOn(":android:publishAndroidPublicationToCentralPortalStagingRepository")
         from(layout.buildDirectory.dir("staging-deploy"))
         archiveFileName.set("$publishProjectName-$version-bundle.zip")
         destinationDirectory.set(layout.buildDirectory.dir("central-portal"))
@@ -965,34 +675,12 @@ val publishToCentralPortal =
 // Tasks
 // ============================================================================
 
-// Exact test lifecycle task. Without this, ./gradlew test is ambiguous between
-// Android test task names. This runs commonTest through the KMP allTests
-// lifecycle and adds the Android host + Swift Export parity tests.
+// Runs every test this host can execute: commonTest on every target with a test
+// runner, plus the Swift Export parity test. The android project registers its
+// own test task, so ./gradlew test runs the Android tests as well.
 tasks.register("test") {
     group = "verification"
-    description = "Runs the commonTest-backed KMP suite, Android host tests, and Swift Export smoke test."
-    dependsOn("hostTests")
-    dependsOn("swiftExportSmokeTest")
-}
-
-tasks.register("setupAndroidSdk") {
-    group = "setup"
-    description = "Downloads and configures the project-local Android SDK. (Alias for ensureAndroidSdk)"
-    dependsOn("ensureAndroidSdk")
-}
-
-// Explicit test runner. Named hostTests to avoid shadowing the KMP allTests
-// lifecycle task. Do not use findByName/mapNotNull here: missing test tasks
-// mean the target surface drifted and must fail loudly.
-tasks.register("hostTests") {
-    group = "verification"
-    description = "Runs every enabled target's tests that this host can execute, plus Android host tests."
-    dependsOn(
-        "kotlinUpgradeYarnLock",
-        "kotlinWasmUpgradeYarnLock",
-        "allTests",
-        "testAndroidHostTest",
-    )
+    description = "Runs every test this host can execute, on every platform."
 }
 
 // Patch generated SPM Package.swift to include minimum macOS platform for Swift Concurrency
@@ -1097,14 +785,76 @@ tasks.register("swiftExportSmokeTest") {
 }
 
 // ============================================================================
-// `build` aggregate
+// IDE dependency views
 // ----------------------------------------------------------------------------
-// Derived from the kotlin { } target block itself, so it can never drift from
-// it: every declared target (Android, JVM, JS, Wasm JS/WASI, every Kotlin/Native
-// slice, and the shared metadata target) contributes every compilation's
-// compile + "classes"/klib lifecycle task, its artifact (jar/klib) task, and —
-// for native targets — every link task for every declared binary (static,
-// shared, framework, test executable). Retired targets are rejected outright.
+// IntelliJ's Gradle tool window lists dependencies per Java source set: each
+// one's compile and runtime classpath. The Kotlin plugin registers Java source
+// sets only for jvm(). Every Kotlin source set gets a view here, so the tree
+// shows dependencies by platform and by every shared source set (commonMain,
+// nativeMain, appleMain, iosMain, webMain, browserMain, posixMain, ...):
+//
+//   <sourceSet>DependenciesCompileClasspath  what the source set compiles against
+//   <sourceSet>DependenciesRuntimeClasspath  what it runs with
+//
+// A platform source set mirrors its compilation's classpaths; a shared source
+// set mirrors its metadata compilation. Each view extends the classpath it
+// mirrors and carries its attributes, so it resolves exactly the same graph.
+// ============================================================================
+fun <T : Any> copyAttribute(
+    key: Attribute<T>,
+    from: AttributeContainer,
+    to: AttributeContainer,
+) {
+    from.getAttribute(key)?.let { to.attribute(key, it) }
+}
+
+fun Configuration.mirror(source: Configuration) {
+    extendsFrom(source)
+    source.attributes.keySet().forEach { copyAttribute(it, source.attributes, attributes) }
+}
+
+val javaSourceSets = extensions.getByType<JavaPluginExtension>().sourceSets
+
+fun registerDependencyView(
+    sourceSetName: String,
+    compileClasspathName: String,
+    runtimeClasspathName: String,
+) {
+    val view = javaSourceSets.maybeCreate("${sourceSetName}Dependencies")
+    configurations.named(view.compileClasspathConfigurationName) { mirror(configurations.getByName(compileClasspathName)) }
+    configurations.named(view.runtimeClasspathConfigurationName) { mirror(configurations.getByName(runtimeClasspathName)) }
+}
+
+kotlin.targets.configureEach {
+    compilations.configureEach {
+        val compileClasspathName = compileDependencyConfigurationName
+        registerDependencyView(
+            defaultSourceSet.name,
+            compileClasspathName,
+            runtimeDependencyConfigurationName ?: compileClasspathName,
+        )
+    }
+}
+
+// ============================================================================
+// Build lifecycle
+// ----------------------------------------------------------------------------
+// The build owns its task graph; CI and the IDE only invoke it. Every declared
+// target joins a platform by family, and each platform gets four tasks:
+//
+//   compile<Platform>   every main and test compilation of the platform
+//   assemble<Platform>  compile<Platform> plus jars and klibs, and every native
+//                       binary: static and shared libraries, frameworks, test
+//                       executables
+//   build<Platform>     assemble<Platform>; builds, never runs tests
+//   test<Platform>      every test of the platform this host can run; runs the
+//                       host cannot execute (Linux on macOS, Windows elsewhere)
+//                       are skipped by the Kotlin plugin
+//
+// assemble depends on every assemble<Platform>, so build compiles and links
+// every target; test depends on every test<Platform>. Adding a target to the
+// kotlin { } block adds it to these tasks. Android builds in the android
+// project.
 // ============================================================================
 val retiredTargetNames =
     setOf(
@@ -1126,72 +876,14 @@ kotlin.targets.configureEach {
     }
 }
 
-// Everything a declared target produces: every compilation's compile and
-// lifecycle task, its jar/klib artifact, and for native targets every link task
-// of every declared binary (static, shared, framework, test executable).
-fun Task.dependsOnTargetOutputs(target: KotlinTarget) {
-    dependsOn(target.artifactsTaskName)
-    target.compilations.configureEach {
-        val lifecycleTaskName = compileAllTaskName
-        dependsOn(compileTaskProvider)
-        // The Android library target names a <compilation>Classes lifecycle task
-        // that the Android plugin never registers; depend on it only if it exists.
-        dependsOn(tasks.named { it == lifecycleTaskName })
-    }
-    if (target.platformType == KotlinPlatformType.androidJvm) {
-        // The AAR and the host and device test packages are variant outputs, not
-        // the target's artifact task.
-        dependsOn("assembleAndroidMain", "assembleAndroidHostTest", "assembleAndroidDeviceTest")
-    }
-    if (target is KotlinNativeTarget) {
-        dependsOn("${target.name}Binaries", "${target.name}TestBinaries")
-        target.binaries.configureEach {
-            dependsOn(linkTaskProvider)
-        }
-    }
-}
-
-// Every test run the target declares. Runs the host cannot execute (Linux on
-// macOS, Windows elsewhere) are skipped by the Kotlin plugin, not by this list.
-fun Task.dependsOnTargetTests(target: KotlinTarget) {
-    if (target is KotlinTargetWithTests<*, *>) {
-        target.testRuns.configureEach {
-            dependsOn("${target.name}${name.replaceFirstChar(Char::uppercaseChar)}")
-        }
-    }
-    if (target.platformType == KotlinPlatformType.androidJvm) {
-        dependsOn("testAndroidHostTest")
-    }
-}
-
-tasks.named("build") {
-    dependsOn(
-        "kotlinUpgradeYarnLock",
-        "kotlinStoreYarnLock",
-        "kotlinWasmUpgradeYarnLock",
-        "kotlinWasmStoreYarnLock",
-        "swiftExportSmokeTest",
-        "assemble${frameworkName}XCFramework",
-    )
-    kotlin.targets.configureEach { dependsOnTargetOutputs(this) }
-}
-
-// ============================================================================
-// Per-platform CI aggregates
-// ----------------------------------------------------------------------------
-// Each platform workflow under .github/workflows calls exactly one of these, so
-// the task list lives in the build and the workflow cannot drift from it. Each
-// aggregate builds every output of its platform's declared targets and runs
-// every test the runner host can execute. Targets join an aggregate by platform
-// family, so adding a target to the kotlin { } block adds it to CI.
-// ============================================================================
-fun KotlinTarget.ciPlatform(): String? =
+fun KotlinTarget.platformName(): String? =
     when (platformType) {
         KotlinPlatformType.common -> null
         KotlinPlatformType.jvm -> "Jvm"
-        KotlinPlatformType.androidJvm -> "Android"
         KotlinPlatformType.js -> "Js"
         KotlinPlatformType.wasm -> "Wasm"
+        KotlinPlatformType.androidJvm ->
+            throw GradleException("Target '$name' belongs in the android project, not the root build.")
         KotlinPlatformType.native ->
             when ((this as KotlinNativeTarget).konanTarget.family) {
                 Family.ANDROID -> "AndroidNative"
@@ -1201,31 +893,71 @@ fun KotlinTarget.ciPlatform(): String? =
                 Family.WATCHOS -> "Watchos"
                 Family.LINUX -> "Linux"
                 Family.MINGW -> "Windows"
-                else -> throw GradleException("Target '$name' has no CI platform aggregate.")
+                else -> throw GradleException("Target '$name' has no platform in the build lifecycle.")
             }
     }
 
-val ciPlatformExtraTasks =
+val platformNames = listOf("Jvm", "AndroidNative", "Ios", "Macos", "Tvos", "Watchos", "Linux", "Windows", "Js", "Wasm")
+
+// Outputs a platform builds beyond its targets' own: the JS and Wasm lockfile
+// stores, and the Apple XCFramework, which spans every Apple platform.
+val platformExtraOutputs =
     mapOf(
         "Js" to listOf("kotlinUpgradeYarnLock", "kotlinStoreYarnLock"),
         "Wasm" to listOf("kotlinWasmUpgradeYarnLock", "kotlinWasmStoreYarnLock"),
         "Ios" to listOf("assemble${frameworkName}XCFramework"),
     )
 
-for (platform in listOf("Jvm", "Android", "AndroidNative", "Ios", "Macos", "Tvos", "Watchos", "Linux", "Windows", "Js", "Wasm")) {
-    tasks.register("ci$platform") {
-        group = "verification"
-        description = "Builds every $platform target output and runs every $platform test this host can execute."
-        dependsOn(ciPlatformExtraTasks[platform].orEmpty())
-        kotlin.targets.matching { it.ciPlatform() == platform }.configureEach {
-            dependsOnTargetOutputs(this)
-            dependsOnTargetTests(this)
+// Tests a platform runs beyond its targets' test runs: Swift Export builds the
+// macOS slice and runs swift test against it.
+val platformExtraTests = mapOf("Macos" to listOf("swiftExportSmokeTest"))
+
+fun platformTargets(platform: String) = kotlin.targets.matching { it.platformName() == platform }
+
+for (platform in platformNames) {
+    val compilePlatform =
+        tasks.register("compile$platform") {
+            group = "build"
+            description = "Compiles every main and test compilation of the $platform targets."
+            platformTargets(platform).configureEach {
+                compilations.configureEach {
+                    dependsOn(compileTaskProvider)
+                    dependsOn(compileAllTaskName)
+                }
+            }
         }
+    val assemblePlatform =
+        tasks.register("assemble$platform") {
+            group = "build"
+            description = "Builds every artifact and binary of the $platform targets."
+            dependsOn(compilePlatform)
+            dependsOn(platformExtraOutputs[platform].orEmpty())
+            platformTargets(platform).configureEach {
+                dependsOn(artifactsTaskName)
+                if (this is KotlinNativeTarget) {
+                    binaries.configureEach { dependsOn(linkTaskProvider) }
+                }
+            }
+        }
+    val testPlatform =
+        tasks.register("test$platform") {
+            group = "verification"
+            description = "Runs every test of the $platform targets that this host can execute."
+            dependsOn(platformExtraTests[platform].orEmpty())
+            platformTargets(platform).configureEach {
+                if (this is KotlinTargetWithTests<*, *>) {
+                    testRuns.configureEach {
+                        if (this is ExecutionTaskHolder<*>) dependsOn(executionTask)
+                    }
+                }
+            }
+        }
+    tasks.register("build$platform") {
+        group = "build"
+        description = "Builds every artifact and binary of the $platform targets. Runs no tests."
+        dependsOn(assemblePlatform)
     }
+    tasks.named("test") { dependsOn(testPlatform) }
 }
 
-tasks.register("ciSwift") {
-    group = "verification"
-    description = "Builds the Swift Export package and runs swift test against it."
-    dependsOn("swiftExportSmokeTest")
-}
+tasks.named("assemble") { dependsOn(platformNames.map { "assemble$it" }) }
