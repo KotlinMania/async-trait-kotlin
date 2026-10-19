@@ -440,6 +440,15 @@ kotlin {
     androidNativeArm64 { configureBenchmarkCompilation() }
     androidNativeX64 { configureBenchmarkCompilation() }
 
+    targets.withType<KotlinNativeTarget>().configureEach {
+        binaries.staticLib {
+            baseName = frameworkName
+        }
+        binaries.sharedLib {
+            baseName = frameworkName
+        }
+    }
+
     // Web
     js {
         configureBenchmarkCompilation()
@@ -1075,59 +1084,63 @@ tasks.register("swiftExportSmokeTest") {
 // ============================================================================
 // `build` aggregate
 // ----------------------------------------------------------------------------
-// Every configured native target, unconditionally. This is the audit contract —
-// it must mirror the kotlin { } target block exactly. All native 32-bit and
-// Apple-specific x64 targets are retired; every retained target MUST build.
-// Do not add a dynamic tasks.matching fallback here: copied templates must make
-// the target surface explicit so missing declarations fail loudly in review.
+// Derived from the kotlin { } target block itself, so it can never drift from
+// it: every declared target (Android, JVM, JS, Wasm JS/WASI, every Kotlin/Native
+// slice, and the shared metadata target) contributes every compilation's
+// compile + "classes"/klib lifecycle task, its artifact (jar/klib) task, and —
+// for native targets — every link task for every declared binary (static,
+// shared, framework, test executable). Retired targets are rejected outright.
 // ============================================================================
-val nativeTargetNames =
-    listOf(
-        "androidNativeArm64",
-        "androidNativeX64",
-        "iosArm64",
-        "iosSimulatorArm64",
-        "linuxArm64",
-        "linuxX64",
-        "macosArm64",
-        "mingwX64",
-        "tvosArm64",
-        "tvosSimulatorArm64",
-        "watchosDeviceArm64",
-        "watchosSimulatorArm64",
+val retiredTargetNames =
+    setOf(
+        "androidNativeArm32",
+        "androidNativeX86",
+        "iosX64",
+        "linuxArm32Hfp",
+        "macosX64",
+        "mingwX86",
+        "tvosX64",
+        "watchosArm32",
+        "watchosArm64",
+        "watchosX64",
     )
 
-val fullTargetBuildTaskNames =
-    buildSet {
-        addAll(
-            listOf(
-                "compileAndroidMain",
-                "compileAndroidHostTest",
-                "compileAndroidDeviceTest",
-                "assembleAndroidMain",
-                "assembleUnitTest",
-                "assembleAndroidTest",
-                "assembleAndroidDeviceTest",
-                "jvmMainClasses",
-                "jvmTestClasses",
-                "kotlinUpgradeYarnLock",
-                "kotlinWasmUpgradeYarnLock",
-                "jsMainClasses",
-                "jsTestClasses",
-                "wasmJsMainClasses",
-                "wasmJsTestClasses",
-                "wasmWasiMainClasses",
-                "wasmWasiTestClasses",
-                "swiftExportSmokeTest",
-                "assemble${frameworkName}XCFramework",
-            ),
-        )
-        for (target in nativeTargetNames) {
-            add("${target}Binaries")
-            add("${target}TestBinaries")
-        }
+kotlin.targets.configureEach {
+    if (name in retiredTargetNames) {
+        throw GradleException("Target '$name' is retired by workspace policy (§5.5) and must not be declared.")
     }
+}
 
 tasks.named("build") {
-    dependsOn(fullTargetBuildTaskNames)
+    dependsOn(
+        "kotlinUpgradeYarnLock",
+        "kotlinStoreYarnLock",
+        "kotlinWasmUpgradeYarnLock",
+        "kotlinWasmStoreYarnLock",
+        "swiftExportSmokeTest",
+        "assemble${frameworkName}XCFramework",
+    )
+    kotlin.targets.configureEach {
+        val target = this
+        dependsOn(target.artifactsTaskName)
+        target.compilations.configureEach {
+            dependsOn(compileTaskProvider)
+            dependsOn(compileAllTaskName)
+        }
+        if (target is KotlinNativeTarget) {
+            dependsOn("${target.name}Binaries", "${target.name}TestBinaries")
+            target.binaries.configureEach {
+                dependsOn(linkTaskProvider)
+            }
+        }
+    }
+}
+
+tasks.register("printTargetTaskNames") {
+    doLast {
+        kotlin.targets.forEach { t ->
+            println("TARGET ${t.name} artifacts=${t.artifactsTaskName} compileAll=${t.compilations.map { it.compileAllTaskName }} compile=${t.compilations.map { it.compileKotlinTaskName }} exists=${t.compilations.map { tasks.findByName(it.compileAllTaskName) != null }} artExists=${tasks.findByName(t.artifactsTaskName) != null}")
+        }
+        println("ANDROID " + tasks.names.filter { it.contains("ndroid") && !it.contains("Native") }.sorted())
+    }
 }
