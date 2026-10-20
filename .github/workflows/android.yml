@@ -43,7 +43,7 @@ jobs:
         env:
           ANDROID_HOME: ${{ github.workspace }}/.android-sdk
         run: >
-          ./gradlew -p verification/android-consumer
+          env -u ANDROID_SDK_ROOT ./gradlew -p verification/android-consumer
           verifyAndroidPublication
           --refresh-dependencies
           --no-configuration-cache

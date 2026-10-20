@@ -40,7 +40,7 @@ dependencies on the compile classpath.
 
 ```bash
 ./gradlew prepareAndroidPublicationVerification --no-configuration-cache
-ANDROID_HOME="$PWD/.android-sdk" ./gradlew -p verification/android-consumer \
+env -u ANDROID_SDK_ROOT ANDROID_HOME="$PWD/.android-sdk" ./gradlew -p verification/android-consumer \
   verifyAndroidPublication --refresh-dependencies --no-configuration-cache
 ```
 
