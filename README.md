@@ -31,6 +31,26 @@ dependencies {
 ./gradlew test
 ```
 
+### Android publication verification
+
+The Android target produces an AAR through the Android KMP plugin. The Central
+bundle check requires its compiled expansion API, Android manifest, matching
+POM and Gradle module metadata, and the public Syn, proc-macro2 and quote
+dependencies on the compile classpath.
+
+```bash
+./gradlew prepareAndroidPublicationVerification --no-configuration-cache
+ANDROID_HOME="$PWD/.android-sdk" ./gradlew -p verification/android-consumer \
+  verifyAndroidPublication --refresh-dependencies --no-configuration-cache
+```
+
+The separate consumer resolves only the verified bundle's Async Trait
+publications, checks selection of the Android AAR, and compiles calls to the
+public token API. Dependencies still resolve from their published repositories.
+The Android workflow and publication dry run include these checks. Upload to
+Central also requires the bundle check. These focused checks accompany the
+full build, tests and strict Swift validation required for release.
+
 ### Targets
 
 - macOS arm64

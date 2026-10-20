@@ -36,4 +36,14 @@ jobs:
           assembleUnitTest
           assembleAndroidTest
           testAndroidHostTest
+          prepareAndroidPublicationVerification
+          --no-configuration-cache
+
+      - name: Resolve and compile the packaged Android publication
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+        run: >
+          ./gradlew -p verification/android-consumer
+          verifyAndroidPublication
+          --refresh-dependencies
           --no-configuration-cache

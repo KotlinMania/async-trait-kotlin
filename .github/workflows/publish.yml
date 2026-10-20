@@ -54,12 +54,21 @@ jobs:
           npm --version
           yarn --version
 
-      - name: Build (dry run)
+      - name: Verify publication bundle (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
-        # Keep workflow_dispatch safe (no publishing), and keep runtime low by focusing on JVM/Android output.
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        run: ./gradlew setupAndroidSdk compileAndroidMain androidSourcesJar --no-configuration-cache
+        run: ./gradlew setupAndroidSdk prepareAndroidPublicationVerification --no-configuration-cache
+
+      - name: Resolve and compile the packaged Android publication (dry run)
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+        run: >
+          ./gradlew -p verification/android-consumer
+          verifyAndroidPublication
+          --refresh-dependencies
+          --no-configuration-cache
 
       - name: Publish to Maven Central
         if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}

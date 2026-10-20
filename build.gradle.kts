@@ -342,15 +342,6 @@ tasks
         dependsOn(ensureAndroidSdk)
     }
 
-// Gap #9b: KGP-generated bridge boilerplate and KotlinCoroutineSupport runtime
-// produce warnings (unchecked casts, unused expressions, opt-in requirements)
-// that cannot be fixed in source — they are regenerated every build.
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
-    if (name.startsWith("compileSwiftExport")) {
-        compilerOptions.allWarningsAsErrors.set(false)
-    }
-}
-
 val jvmToolchainVersion = providers.gradleProperty("jvm.toolchain").getOrElse("21").toInt()
 
 // ============================================================================
@@ -493,6 +484,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(commonMainDependencyBundle)
+            api(libs.syn.kotlin)
+            api(libs.proc.macro2.kotlin)
+            api(libs.quote.kotlin)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -814,9 +808,54 @@ val centralPortalBundle =
         description = "Bundles the staged Maven artifacts into a Central Portal deployment zip."
         dependsOn(centralPortalPublishTasks)
         from(layout.buildDirectory.dir("staging-deploy"))
+        exclude("**/maven-metadata.*")
+        duplicatesStrategy = DuplicatesStrategy.FAIL
         archiveFileName.set("$publishProjectName-$version-bundle.zip")
         destinationDirectory.set(layout.buildDirectory.dir("central-portal"))
     }
+
+publishing.publications.withType<MavenPublication>().configureEach {
+    val publicationDirectory = "${groupId.replace('.', '/')}/$artifactId/$version"
+    centralPortalBundle.configure { include("$publicationDirectory/**") }
+}
+
+val verifyAndroidPublication =
+    tasks.register<Exec>("verifyAndroidPublication") {
+        group = "verification"
+        description = "Verifies the Android AAR, POM and metadata in the actual Central bundle."
+        dependsOn(centralPortalBundle)
+        val verifier = layout.projectDirectory.file("verification/verify_android_publication.py")
+        val bundle = centralPortalBundle.flatMap { it.archiveFile }
+        val receipt = layout.buildDirectory.file("reports/publication/android.json")
+        inputs.file(verifier)
+        inputs.file(bundle)
+        outputs.file(receipt)
+        commandLine(
+            "python3",
+            verifier.asFile,
+            bundle.get().asFile,
+            "--group",
+            project.group.toString(),
+            "--module",
+            publishProjectName,
+            "--version",
+            project.version.toString(),
+            "--receipt",
+            receipt.get().asFile,
+        )
+    }
+
+tasks.register<Sync>("prepareAndroidPublicationVerification") {
+    group = "verification"
+    description = "Extracts verified root and Android publications for the independent consumer."
+    dependsOn(verifyAndroidPublication)
+    from(centralPortalBundle.flatMap { it.archiveFile }.map { zipTree(it.asFile) }) {
+        val coordinatePath = project.group.toString().replace('.', '/')
+        include("$coordinatePath/$publishProjectName/$version/**")
+        include("$coordinatePath/$publishProjectName-android/$version/**")
+    }
+    into(layout.buildDirectory.dir("verification-android-repository"))
+}
 
 // Upload the bundle to the Sonatype Central Portal Publisher API.
 // publishingType: USER_MANAGED (default, safe — validates then waits for a
@@ -825,7 +864,7 @@ val publishToCentralPortal =
     tasks.register("publishToCentralPortal") {
         group = "publishing"
         description = "Uploads the deployment bundle to the Sonatype Central Portal."
-        dependsOn(centralPortalBundle)
+        dependsOn(verifyAndroidPublication)
         doLast {
             val user =
                 providers.gradleProperty("mavenCentralUsername").orNull
