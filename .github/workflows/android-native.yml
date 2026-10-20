@@ -22,6 +22,9 @@ jobs:
           distribution: zulu
           java-version: '21'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
@@ -31,6 +34,6 @@ jobs:
       - name: Compile Android Native targets
         run: >
           ./gradlew
-          compileKotlinAndroidNativeArm64
-          compileKotlinAndroidNativeX64
+          :library:compileKotlinAndroidNativeArm64
+          :library:compileKotlinAndroidNativeX64
           --no-configuration-cache

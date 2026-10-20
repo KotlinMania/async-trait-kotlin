@@ -52,9 +52,9 @@ jobs:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
         run: >
           ./gradlew
-          wasmJsBrowserTest
-          wasmJsNodeTest
-          wasmWasiNodeTest
+          :library:wasmJsBrowserTest
+          :library:wasmJsNodeTest
+          :library:wasmWasiNodeTest
           --no-configuration-cache
 
       - name: Upload test reports (WASM)
@@ -63,7 +63,7 @@ jobs:
         with:
           name: test-reports-wasm
           path: |
-            build/reports/tests/
-            build/test-results/
+            library/build/reports/tests/
+            library/build/test-results/
           retention-days: 7
           if-no-files-found: warn

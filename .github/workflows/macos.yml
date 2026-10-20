@@ -22,14 +22,17 @@ jobs:
           distribution: zulu
           java-version: '21'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build and test macOS targets
         run: >
           ./gradlew
-          compileKotlinMacosArm64
-          macosArm64Test
+          :library:compileKotlinMacosArm64
+          :library:macosArm64Test
           --no-configuration-cache
 
       - name: Upload test reports (macOS)
@@ -38,7 +41,7 @@ jobs:
         with:
           name: test-reports-macos
           path: |
-            build/reports/tests/
-            build/test-results/
+            library/build/reports/tests/
+            library/build/test-results/
           retention-days: 7
           if-no-files-found: warn

@@ -22,6 +22,9 @@ jobs:
           distribution: zulu
           java-version: '21'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
@@ -30,9 +33,9 @@ jobs:
         # on x64 hosts (no test execution — needs an arm64 runner or qemu).
         run: >
           ./gradlew
-          compileKotlinLinuxX64
-          compileKotlinLinuxArm64
-          linuxX64Test
+          :library:compileKotlinLinuxX64
+          :library:compileKotlinLinuxArm64
+          :library:linuxX64Test
           --no-configuration-cache
 
       - name: Upload test reports (Linux)
@@ -41,7 +44,7 @@ jobs:
         with:
           name: test-reports-linux
           path: |
-            build/reports/tests/
-            build/test-results/
+            library/build/reports/tests/
+            library/build/test-results/
           retention-days: 7
           if-no-files-found: warn

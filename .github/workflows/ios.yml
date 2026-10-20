@@ -22,6 +22,9 @@ jobs:
           distribution: zulu
           java-version: '21'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
@@ -38,10 +41,10 @@ jobs:
           fi
           echo "XCFramework name: $XCF_NAME → task: assemble${XCF_NAME}XCFramework"
           ./gradlew \
-            compileKotlinIosArm64 \
-            compileKotlinIosSimulatorArm64 \
-            iosSimulatorArm64Test \
-            "assemble${XCF_NAME}XCFramework" \
+            :library:compileKotlinIosArm64 \
+            :library:compileKotlinIosSimulatorArm64 \
+            :library:iosSimulatorArm64Test \
+            ":library:assemble${XCF_NAME}XCFramework" \
             --no-configuration-cache
 
       # Native upload-artifact (GitHub-published) makes the test reports
@@ -55,7 +58,7 @@ jobs:
         with:
           name: test-reports-ios
           path: |
-            build/reports/tests/
-            build/test-results/
+            library/build/reports/tests/
+            library/build/test-results/
           retention-days: 7
           if-no-files-found: warn

@@ -78,12 +78,12 @@ val testedVersion =
     providers.gradleProperty("libraryVersion").orElse(producerProperties.map { it.getProperty("project.version") })
 
 kotlin {
-    jvmToolchain(producerProperties.get().getProperty("jvm.toolchain").toInt())
+    jvmToolchain(libs.versions.jvm.get().toInt())
     compilerOptions { allWarningsAsErrors.set(true) }
     android {
         namespace = "io.github.kotlinmania.asynctrait.androidconsumer"
-        compileSdk = producerProperties.get().getProperty("android.compileSdk").toInt()
-        minSdk = producerProperties.get().getProperty("android.minSdk").toInt()
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
         withHostTestBuilder { sourceSetTreeName = "test" }
     }
     sourceSets {

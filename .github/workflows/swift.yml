@@ -33,6 +33,9 @@ jobs:
           distribution: zulu
           java-version: '21'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
 
@@ -77,19 +80,19 @@ jobs:
       #     KotlinRuntimeSupport, ExportedKotlinPackages, KotlinRuntime.
       - name: Build Swift Export package
         env:
-          BUILT_PRODUCTS_DIR: ${{ github.workspace }}/build/swift-test
-          TARGET_BUILD_DIR: ${{ github.workspace }}/build/swift-test
+          BUILT_PRODUCTS_DIR: ${{ github.workspace }}/library/build/swift-test
+          TARGET_BUILD_DIR: ${{ github.workspace }}/library/build/swift-test
           SDK_NAME: macosx
           CONFIGURATION: Debug
           ARCHS: arm64
           FRAMEWORKS_FOLDER_PATH: Frameworks
           MACOSX_DEPLOYMENT_TARGET: "15.0"
           DEPLOYMENT_TARGET_SETTING_NAME: MACOSX_DEPLOYMENT_TARGET
-        run: ./gradlew embedSwiftExportForXcode --no-configuration-cache
+        run: ./gradlew :library:embedSwiftExportForXcode --no-configuration-cache
 
       - name: Run swift test against Kotlin-exported module
-        working-directory: swift-test-harness
-        run: swift test
+        working-directory: library/swift-test-harness
+        run: swift test -Xswiftc -warnings-as-errors
 
       - name: Upload Swift Export artifacts
         if: success() || failure()
@@ -97,8 +100,8 @@ jobs:
         with:
           name: swift-export-artifacts
           path: |
-            build/swift-test/lib*.a
-            build/swift-test/*.swiftmodule/
-            build/SPMPackage/macosArm64/Debug/
+            library/build/swift-test/lib*.a
+            library/build/swift-test/*.swiftmodule/
+            library/build/SPMPackage/macosArm64/Debug/
           retention-days: 7
           if-no-files-found: warn

@@ -47,8 +47,8 @@ jobs:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
         run: >
           ./gradlew
-          jsBrowserTest
-          jsNodeTest
+          :library:jsBrowserTest
+          :library:jsNodeTest
           --no-configuration-cache
 
       - name: Upload test reports (JS)
@@ -57,7 +57,7 @@ jobs:
         with:
           name: test-reports-js
           path: |
-            build/reports/tests/
-            build/test-results/
+            library/build/reports/tests/
+            library/build/test-results/
           retention-days: 7
           if-no-files-found: warn

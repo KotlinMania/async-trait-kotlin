@@ -10,7 +10,7 @@ dependencyResolutionManagement {
     repositories {
         exclusiveContent {
             forRepository {
-                maven { url = uri("../../build/verification-android-repository") }
+                maven { url = uri("../../library/build/verification-android-repository") }
             }
             filter {
                 includeModule("io.github.kotlinmania", "async-trait-kotlin")

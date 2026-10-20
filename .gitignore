@@ -77,3 +77,7 @@ DerivedData/
 node_modules/
 package-lock.json
 !native/node-ffi/package-lock.json
+
+# Module SDK and Swift build state
+**/.android-sdk/
+**/.build/

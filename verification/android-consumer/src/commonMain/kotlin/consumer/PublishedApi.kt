@@ -6,9 +6,9 @@ import io.github.kotlinmania.asynctrait.asyncTraitOrThrow
 import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.quote.ToTokens
 import io.github.kotlinmania.quote.quote
-import io.github.kotlinmania.syn.SynResult
+import io.github.kotlinmania.syn.TokenStreamParseResult
 
-fun expand(): SynResult<TokenStream> =
+fun expand(): TokenStreamParseResult =
     asyncTrait(quote(""), quote("trait Consumer { async fn run(&self); }"))
 
 fun expandOrThrow(): TokenStream =

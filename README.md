@@ -1,22 +1,34 @@
-# async-trait-kotlin in Kotlin
+# async-trait-kotlin
 
-[![GitHub link](https://img.shields.io/badge/GitHub-KotlinMania%2Fasync--trait--kotlin-blue.svg)](https://github.com/KotlinMania/async-trait-kotlin)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.kotlinmania/async-trait-kotlin)](https://central.sonatype.com/artifact/io.github.kotlinmania/async-trait-kotlin)
-[![Build status](https://img.shields.io/github/actions/workflow/status/KotlinMania/async-trait-kotlin/ci.yml?branch=main)](https://github.com/KotlinMania/async-trait-kotlin/actions)
+A Kotlin Multiplatform implementation of the token transformation performed by
+Rust's [async-trait](https://github.com/dtolnay/async-trait), based on version
+0.1.89. It parses trait and implementation items with `syn-kotlin`, transforms
+async method signatures and bodies, and emits tokens with `quote-kotlin` and
+`proc-macro2-kotlin`.
 
-This is a Kotlin Multiplatform line-by-line transliteration port of [`dtolnay/async-tra`](https://github.com/dtolnay/async-trait).
+The implementation and regression tests live in `library/src/commonMain` and
+`library/src/commonTest`. This transformation does not require platform I/O, so
+all targets share the same implementation. Kotlin's default hierarchy connects
+the native, Apple, Linux, Android Native and web source sets.
 
-**Original Project:** This port is based on [`dtolnay/async-tra`](https://github.com/dtolnay/async-trait). All design credit and project intent belong to the upstream authors; this repository is a faithful port to Kotlin Multiplatform with no behavioural changes intended.
+## Gradle structure
 
-### Porting status
+- `settings.gradle.kts` declares repositories and includes `:library`.
+- The root `build.gradle.kts` declares plugin aliases and forwards build, check and test to `:library`.
+- `gradle/libs.versions.toml` controls plugin, SDK, library and tool versions.
+- `gradle.properties` holds Gradle options and publication identity.
+- `library/build.gradle.kts` applies the plugins and declares every target in
+  one `kotlin {}` block, including Android, source sets and Swift Export.
+- `verification/consumer` is an independent build that resolves publications
+  extracted from the verified Central bundle. It does not use project dependencies
+  or source substitution.
 
-This is an **in-progress port**. The goal is feature parity with the upstream Rust crate while providing a native Kotlin Multiplatform API. Every Kotlin file carries a `// port-lint: source <path>` header naming its upstream Rust counterpart so the AST-distance tool can track provenance.
+The declared targets are JVM, Android, JavaScript, Wasm/JS, Wasm/WASI, Linux x64
+and ARM64, Windows x64, Android Native x64 and ARM64, macOS ARM64, iOS ARM64 and
+simulator ARM64, tvOS ARM64 and simulator ARM64, and watchOS device ARM64 and
+simulator ARM64. There are no 32-bit or Apple x64 targets.
 
----
-
-## About this Kotlin port
-
-### Installation
+## Installation
 
 ```kotlin
 dependencies {
@@ -24,55 +36,159 @@ dependencies {
 }
 ```
 
-### Building
+## API
 
-```bash
-./gradlew build
-./gradlew test
+The Maven identity is `io.github.kotlinmania:async-trait-kotlin`; the version
+for this checkout is in `gradle.properties`. Kotlin consumers can call the
+concrete text API:
+
+```kotlin
+import io.github.kotlinmania.asynctrait.expandAsyncTrait
+
+val expansion = expandAsyncTrait("", "trait Service { async fn run(&self); }")
+check(expansion.isSuccess) { expansion.error.orEmpty() }
+println(expansion.source)
 ```
 
-### Android publication verification
+`asyncTrait` and `asyncTraitOrThrow` accept token streams. Their public token
+and syntax-tree types are supplied as API dependencies, so a consumer does not
+need to repeat the three implementation-library coordinates.
 
-The Android target produces an AAR through the Android KMP plugin. The Central
-bundle check requires its compiled expansion API, Android manifest, matching
-POM and Gradle module metadata, and the public Syn, proc-macro2 and quote
-dependencies on the compile classpath.
+`asyncTrait` returns Syn's concrete `TokenStreamParseResult`, containing either
+`value: TokenStream?` or `error: SynError?`. `parseArgs` and `Args.parse` return
+the concrete `ArgsParseResult`, containing either `value: Args?` or the same typed
+diagnostic. Both result types preserve the original value or diagnostic object.
+`parseArgs` accepts either a complete `TokenStream` or an existing `ParseStream`.
 
-```bash
-./gradlew prepareAndroidPublicationVerification --no-configuration-cache
-env -u ANDROID_SDK_ROOT ANDROID_HOME="$PWD/.android-sdk" ./gradlew -p verification/android-consumer \
+`asyncTraitOrThrow` retains its token-stream signature and throws an
+`IllegalArgumentException` on a returned parse failure, using an internal exception
+that carries the original diagnostic. Callers that caught `SynError` should inspect
+the result from `asyncTrait` or catch `IllegalArgumentException` at their throwing
+boundary. The diagnostic itself is not the exception.
+
+Swift callers can inspect concrete token, argument and diagnostic properties,
+or use `expandAsyncTrait` for its text `source`, `error` and `isSuccess` properties.
+The generated direct-export `asyncTraitOrThrow` declaration does not have Swift
+`throws`. Inspect result properties for Swift failure handling.
+
+These concrete return contracts replace `SynResult<TokenStream>` and
+`SynResult<Args>` at the public boundary. This changes binary signatures;
+compiled consumers must rebuild, and explicitly typed result variables must use
+the concrete types. Code passing `::parseArgs` to a generic parser should call
+the complete-token `parseArgs(tokens)` entry point instead. Generic parser
+callbacks remain an internal implementation detail here; public result classes
+do not inherit from a generic result and do not expose generic `fold` or `map`
+callbacks.
+
+## Build and test
+
+Use JDK 21 and an Android SDK containing the catalog's compile SDK. Android
+Studio's `local.properties` or the standard `ANDROID_HOME` environment variable
+selects the SDK.
+
+```shell
+./gradlew :library:test :library:build --continue
+```
+
+`build` compiles every declared main and test compilation, links every native
+binary, creates Android AAR and device-test APK outputs, JVM and web archives,
+and debug/release Apple frameworks and XCFrameworks on macOS. It also runs
+ktlint and detekt. `test` executes the KMP test environments, Android host and
+managed-device tests, and the Swift consumer on macOS. `check` includes `test`.
+Building a test executable is not counted as executing its tests.
+
+JavaScript and Wasm/JS browser tests use Chrome Headless. Node runs JavaScript,
+Wasm/JS and Wasm/WASI tests. Apple simulator tests require an installed runtime
+and device for each of iOS, tvOS and watchOS. Linux ARM64 and Windows tests must
+run on those hosts; a skipped runner is not successful platform validation.
+
+For Android Native, set `ANDROID_SERIAL_ARM64` and/or `ANDROID_SERIAL_X64` to
+connected devices reported by `adb devices`. The `androidNativeArm64Test` and
+`androidNativeX64Test` tasks verify the device ABI and execute the compiled
+native test binary through adb. They are part of `allTests` and `test`; absent
+device selections produce explicit skipped tasks. The managed Android
+emulator is owned and stopped by the Android Gradle plugin, independently of
+these connected-device runners.
+
+Swift Export's Xcode integration requires its standard build environment. For
+a macOS command-line validation, provide:
+
+```shell
+SDK_NAME=macosx CONFIGURATION=Debug ARCHS=arm64 \
+BUILT_PRODUCTS_DIR="$PWD/library/build/swift-test" \
+TARGET_BUILD_DIR="$PWD/library/build/swift-test" \
+FRAMEWORKS_FOLDER_PATH=Frameworks MACOSX_DEPLOYMENT_TARGET=15.0 \
+DEPLOYMENT_TARGET_SETTING_NAME=MACOSX_DEPLOYMENT_TARGET \
+./gradlew :library:test :library:build --continue
+```
+
+The Swift tests import the generated `AsyncTrait` module and exercise real
+expansion and diagnostics, including malformed trait and implementation bodies.
+Kotlin and Swift warnings are build failures. Full local KMP validation is the
+primary gate before consumer CI or release; individual platform checks do not
+replace it.
+
+## Android publication acceptance
+
+The independently staged AAR must contain the expansion bytecode, manifest,
+matching POM/module metadata, and the public Syn, proc-macro2 and quote API dependencies.
+Eight Python regression cases validate the real bundle and reject invalid payloads.
+The separate Android consumer forces three named Kotlin behavior tests to execute
+and rejects missing, skipped or failing XML cases.
+
+```shell
+./gradlew :library:prepareAndroidPublicationVerification --no-configuration-cache
+env -u ANDROID_SDK_ROOT ./gradlew -p verification/android-consumer \
   verifyAndroidPublication --refresh-dependencies --no-configuration-cache
 ```
 
-The separate consumer resolves only the verified bundle's Async Trait
-publications, checks selection of the Android AAR, and compiles and executes
-Android host tests of the public token API. Dependencies still resolve from
-their published repositories.
-The Android workflow and publication dry run include these checks. Upload to
-Central also requires the bundle check. These focused checks accompany the
-full build, tests and strict Swift validation required for release.
+The Android reusable workflow and `publish=false` dry run retain these checks.
+The standard `ANDROID_HOME` or root `local.properties` selects the SDK; private
+SDK paths are not copied between checkouts.
 
-### Targets
+## Publications
 
-- macOS arm64
-- Linux x64
-- Windows mingw-x64
-- iOS arm64 / simulator-arm64 (Swift export + XCFramework)
-- JS (browser + Node.js)
-- Wasm-JS (browser + Node.js)
-- Android (API 24+)
+Gradle's `maven-publish` and `signing` plugins produce the root multiplatform
+metadata and target publications. Android selects an AAR; JVM selects its JAR;
+native, JavaScript and Wasm consumers select platform-specific KLIBs. The root
+JAR contains Kotlin metadata; it does not contain JVM bytecode. Apple KLIB
+publications and the separately built XCFrameworks are distinct artifacts.
 
-### Porting guidelines
+```shell
+./gradlew :library:preparePublicationVerification
+./gradlew -p verification/consumer -PlibraryVersion=0.1.3 verifyPublication allTests --refresh-dependencies --continue
+```
 
-See [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md) for translator discipline, port-lint header convention, and Rust → Kotlin idiom mapping.
+`centralPortalBundle` stages Maven files under `library/build/staging-deploy`
+and creates a ZIP under `library/build/central-portal`. It includes only the
+current publication coordinates and version. It does not upload.
+`verifyCentralPortalBundle` inspects the ZIP's AAR, compiled Kotlin/JVM JAR,
+KLIB payloads, metadata links, hashes and publication variants.
+`preparePublicationVerification` extracts that checked ZIP into the consumer's
+exclusive repository. The consumer checks selected target variants and compiles
+its real API calls against them. Receipts are written under `build/reports/publication`
+in each build.
 
-### License
+On macOS, `build` also verifies the debug/release XCFramework headers, modules,
+ARM64 architectures and compiled Mach-O device/simulator platform identifiers.
+The separate Swift Export consumer remains part of `test`.
 
-This Kotlin port is distributed under the same MIT license as the upstream [`dtolnay/async-tra`](https://github.com/dtolnay/async-trait). See [LICENSE](LICENSE) (and any sibling `LICENSE-*` / `NOTICE` files mirrored from upstream) for the full text.
+Supply `signingInMemoryKey`, `signingInMemoryKeyId` and
+`signingInMemoryKeyPassword` through secure Gradle properties to sign the files.
 
-Original work copyrighted by the async-tra authors.  
-Kotlin port: Copyright (c) 2026 Sydney Renee and The Solace Project.
+`publishToCentralPortal` verifies the signed bundle and requires Central Portal credentials. Its
+default is `USER_MANAGED`, which waits for Portal validation. Use
+`-PcentralPublishingType=AUTOMATIC` to request publication. The task reports the
+deployment ID and fails if validation fails. Inspect that deployment before
+retrying an interrupted upload.
 
-### Acknowledgments
+The validation workflow is manual or reusable; it has no push or pull-request
+trigger. It declares Apple simulator, Linux x64/ARM64, Windows x64, Android x64,
+JVM, browser and Node coverage. Android ARM64 execution requires an actual
+connected ARM64 device or emulator. Publication waits for the validation
+workflow at the same revision.
 
-Thanks to the [`dtolnay/async-tra`](https://github.com/dtolnay/async-trait) maintainers and contributors for the original Rust implementation. This port reproduces their work in Kotlin Multiplatform; bug reports about upstream design or behavior should go to the upstream repository.
+## License
+
+This port retains the existing MIT license in [LICENSE](LICENSE). The upstream
+async-trait crate is available under MIT or Apache-2.0.

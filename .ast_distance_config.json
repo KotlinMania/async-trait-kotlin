@@ -6,7 +6,7 @@
     "lang": "rust"
   },
   "target": {
-    "path": "src/commonMain/kotlin/io/github/kotlinmania/asynctrait",
+    "path": "library/src/commonMain/kotlin/io/github/kotlinmania/asynctrait",
     "lang": "kotlin"
   },
   "checks": {

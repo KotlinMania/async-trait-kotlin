@@ -31,17 +31,13 @@ jobs:
       - name: Build and test Android targets
         run: >
           ./gradlew
-          setupAndroidSdk
-          compileAndroidMain
-          assembleUnitTest
-          assembleAndroidTest
-          testAndroidHostTest
-          prepareAndroidPublicationVerification
+          :library:compileAndroidMain
+          :library:assembleAndroidDeviceTest
+          :library:testAndroidHostTest
+          :library:prepareAndroidPublicationVerification
           --no-configuration-cache
 
       - name: Resolve and compile the packaged Android publication
-        env:
-          ANDROID_HOME: ${{ github.workspace }}/.android-sdk
         run: >
           env -u ANDROID_SDK_ROOT ./gradlew -p verification/android-consumer
           verifyAndroidPublication
@@ -54,7 +50,7 @@ jobs:
         with:
           name: android-publication-verification
           path: |
-            build/reports/publication/
+            library/build/reports/publication/
             verification/android-consumer/build/reports/publication/
             verification/android-consumer/build/test-results/
           if-no-files-found: error

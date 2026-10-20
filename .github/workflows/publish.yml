@@ -17,7 +17,15 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    if: ${{ github.event_name == 'release' || inputs.publish }}
+    uses: ./.github/workflows/gradle.yml
+    permissions:
+      contents: read
+
   publish:
+    needs: validate
+    if: ${{ always() && (needs.validate.result == 'success' || (github.event_name == 'workflow_dispatch' && !inputs.publish)) }}
     name: Publish to Maven Central
     runs-on: macos-latest
 
@@ -36,6 +44,9 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
@@ -58,12 +69,10 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        run: ./gradlew setupAndroidSdk prepareAndroidPublicationVerification --no-configuration-cache
+        run: ./gradlew :library:prepareAndroidPublicationVerification --no-configuration-cache
 
       - name: Resolve and compile the packaged Android publication (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
-        env:
-          ANDROID_HOME: ${{ github.workspace }}/.android-sdk
         run: >
           env -u ANDROID_SDK_ROOT ./gradlew -p verification/android-consumer
           verifyAndroidPublication
@@ -72,7 +81,7 @@ jobs:
 
       - name: Publish to Maven Central
         if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
-        run: ./gradlew setupAndroidSdk publishToCentralPortal -PcentralPublishingType=AUTOMATIC --no-configuration-cache
+        run: ./gradlew :library:publishToCentralPortal -PcentralPublishingType=AUTOMATIC --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
@@ -87,7 +96,7 @@ jobs:
         with:
           name: android-publication-verification
           path: |
-            build/reports/publication/
+            library/build/reports/publication/
             verification/android-consumer/build/reports/publication/
             verification/android-consumer/build/test-results/
           if-no-files-found: error
