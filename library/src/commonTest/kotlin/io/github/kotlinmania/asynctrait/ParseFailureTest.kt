@@ -34,18 +34,20 @@ class ParseFailureTest {
 
     @Test
     fun publicThrowingApiRejectsMalformedArguments() {
-        val failure = assertFailsWith<IllegalArgumentException> {
-            asyncTraitOrThrow(quote("?"), quote("trait Service {}"))
-        }
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                asyncTraitOrThrow(quote("?"), quote("trait Service {}"))
+            }
 
         assertTrue(assertNotNull(failure.message).contains("expected"))
     }
 
     @Test
     fun wherePredicateHelperRetainsParseFailureBehavior() {
-        val failure = assertFailsWith<AsyncTraitParseException> {
-            parseQuoteWherePredicate(quote("?"))
-        }
+        val failure =
+            assertFailsWith<AsyncTraitParseException> {
+                parseQuoteWherePredicate(quote("?"))
+            }
 
         assertTrue(assertNotNull(failure.message).isNotEmpty())
         assertEquals(failure.diagnostic.message, failure.message)
@@ -53,9 +55,10 @@ class ParseFailureTest {
 
     @Test
     fun returnTypeHelperRetainsParseFailureBehavior() {
-        val failure = assertFailsWith<AsyncTraitParseException> {
-            parseQuoteReturnType(quote("->"))
-        }
+        val failure =
+            assertFailsWith<AsyncTraitParseException> {
+                parseQuoteReturnType(quote("->"))
+            }
 
         assertTrue(assertNotNull(failure.message).isNotEmpty())
         assertEquals(failure.diagnostic.message, failure.message)

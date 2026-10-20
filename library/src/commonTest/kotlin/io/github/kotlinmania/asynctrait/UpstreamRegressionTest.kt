@@ -44,19 +44,21 @@ class UpstreamRegressionTest {
 
     @Test
     fun receiverReplacementDoesNotEnterNestedImplementations() {
-        val output = expanded(
-            "trait Trait: Sized { async fn f(self) { struct Nested; impl Nested { fn f(self) { let _ = " +
-            "self; } } let _ = self; } }",
-        )
+        val output =
+            expanded(
+                "trait Trait: Sized { async fn f(self) { struct Nested; impl Nested { fn f(self) { let _ = " +
+                    "self; } } let _ = self; } }",
+            )
         contains(output, "impl Nested { fn f(self) { let _ = self; } }")
         contains(output, "let _ = __self;")
     }
 
     @Test
     fun returnTypesKeepFullyQualifiedFutureAndPinPaths() {
-        val output = expanded(
-            "trait Trait { async fn f() -> Box<dyn Iterator<Item = ()>> { Box::new(std::iter::empty()) } }",
-        )
+        val output =
+            expanded(
+                "trait Trait { async fn f() -> Box<dyn Iterator<Item = ()>> { Box::new(std::iter::empty()) } }",
+            )
         contains(output, "::core::pin::Pin<Box<dyn ::core::future::Future<Output = Box<dyn Iterator<Item = ()> > >")
         contains(output, "let __ret: Box<dyn Iterator<Item = ()> >")
     }
@@ -88,9 +90,10 @@ class UpstreamRegressionTest {
 
     @Test
     fun instrumentationAttributesRemainOnTheMethod() {
-        val output = expanded(
-            "impl Trait for S { #[instrument(skip(self))] async fn f(&self) { info!(value = self.0); } }",
-        )
+        val output =
+            expanded(
+                "impl Trait for S { #[instrument(skip(self))] async fn f(&self) { info!(value = self.0); } }",
+            )
         contains(output, "#[instrument(skip(self))]")
         contains(output, "info!(value = __self.0)")
     }
@@ -108,15 +111,17 @@ class UpstreamRegressionTest {
 
     @Test
     fun localMacrosAndSelectExpressionsUseTheCapturedReceiver() {
-        val macro = expanded(
-            "trait Trait { async fn f(&self) { macro_rules! local { () => {{ let _: &Self = self; }}; } " +
-            "local!(); } }",
-        )
+        val macro =
+            expanded(
+                "trait Trait { async fn f(&self) { macro_rules! local { () => {{ let _: &Self = self; }}; } " +
+                    "local!(); } }",
+            )
         contains(macro, "let _: &Self = __self;")
-        val select = expanded(
-            "impl Trait for S { async fn f(&self) { futures::select! { () = async { consume(self); }.fuse() " +
-            "=> {} } } }",
-        )
+        val select =
+            expanded(
+                "impl Trait for S { async fn f(&self) { futures::select! { () = async { consume(self); }.fuse() " +
+                    "=> {} } } }",
+            )
         contains(select, "consume(__self)")
     }
 
@@ -144,10 +149,11 @@ class UpstreamRegressionTest {
 
     @Test
     fun qualifiedAssociatedTypesAndExistingWhereClausesArePreserved() {
-        val output = expanded(
-            "trait Trait: Future { async fn flatten(self) -> <Self::Output as Future>::Output where " +
-            "Self::Output: Future + Send, Self: Sized { self.await.await } }",
-        )
+        val output =
+            expanded(
+                "trait Trait: Future { async fn flatten(self) -> <Self::Output as Future>::Output where " +
+                    "Self::Output: Future + Send, Self: Sized { self.await.await } }",
+            )
         contains(output, "Output = <Self::Output as Future>::Output")
         contains(output, "Self::Output: Future + Send")
         contains(output, "__self.await.await")
@@ -184,9 +190,10 @@ class UpstreamRegressionTest {
 
     @Test
     fun wildcardArgumentsAreCapturedBeforeDestructuring() {
-        val output = expanded(
-            "impl Trait for S { async fn f(_: Droppable, Tuple(_, value): Tuple<Droppable, i32>) {} }",
-        )
+        val output =
+            expanded(
+                "impl Trait for S { async fn f(_: Droppable, Tuple(_, value): Tuple<Droppable, i32>) {} }",
+            )
         contains(output, "let __arg0 = __arg0;")
         contains(output, "let Tuple(_, value) = { let __arg1 = __arg1; __arg1 };")
     }
@@ -227,10 +234,11 @@ class UpstreamRegressionTest {
 
     @Test
     fun nestedOpaqueReturnsUseInferenceOnlyInsideTheBody() {
-        val output = expanded(
-            "impl Trait for T { async fn method(&self) -> Result<impl AsRef<str> + Send + Sync, " +
-            "Self::Error> { Ok(\"Hello World\") } }",
-        )
+        val output =
+            expanded(
+                "impl Trait for T { async fn method(&self) -> Result<impl AsRef<str> + Send + Sync, " +
+                    "Self::Error> { Ok(\"Hello World\") } }",
+            )
         contains(output, "Future<Output = Result<impl AsRef<str> + Send + Sync, Self::Error> >")
         contains(output, "let __ret: Result<_, Self::Error>")
     }

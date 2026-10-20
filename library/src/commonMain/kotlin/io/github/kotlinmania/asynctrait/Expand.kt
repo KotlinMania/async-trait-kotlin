@@ -86,7 +86,9 @@ internal fun expand(input: Item, isLocal: Boolean) {
     }
 }
 
-private class Expansion(private val isLocal: Boolean) {
+private class Expansion(
+    private val isLocal: Boolean,
+) {
     fun trait(input: Item.Trait) {
         val traitItem = input.item
         val context = Context.Trait(traitItem.generics, traitItem.supertraits)
@@ -114,10 +116,12 @@ private class Expansion(private val isLocal: Boolean) {
 
     fun implementation(input: Item.Impl) {
         val implItem = input.item
-        val associatedTypeImplTraits = implItem.items.filterIsInstance<ImplItem.AssocType>()
-            .filter { it.ty is SynType.ImplTrait }
-            .map { it.ident.toString() }
-            .toSet()
+        val associatedTypeImplTraits =
+            implItem.items
+                .filterIsInstance<ImplItem.AssocType>()
+                .filter { it.ty is SynType.ImplTrait }
+                .map { it.ident.toString() }
+                .toSet()
         val context = Context.Impl(implItem.generics, associatedTypeImplTraits)
         for (inner in implItem.items) {
             when (inner) {
@@ -175,12 +179,13 @@ private class SignatureTransformation(
 ) {
     fun transform() {
         sig.asyncness = null
-        val (retArrow, ret) = when (val out = sig.output) {
-            is ReturnType.Default -> quote("->") to quote("()")
-            is ReturnType.TypeReturn -> quote("`#`arrow", "arrow" to out.arrowToken) to quote("`#`ty", "ty" to out.ty)
-        }
+        val (retArrow, ret) =
+            when (val out = sig.output) {
+                is ReturnType.Default -> quote("->") to quote("()")
+                is ReturnType.TypeReturn -> quote("`#`arrow", "arrow" to out.arrowToken) to quote("`#`ty", "ty" to out.ty)
+            }
         val lifetimes = collectLifetimes()
-        for (param in sig.generics.params) {
+        for (param in sig.generics.params.toList()) {
             GenericBounds.transform(param, sig.generics)
         }
         addLifetimes(lifetimes)
@@ -224,22 +229,24 @@ private class SignatureTransformation(
 
     private fun addSelfBounds() {
         if (!hasSelf) return
-        val filteredBounds = inferredBounds().filter { bound ->
-            when (context) {
-                is Context.Trait -> hasDefault && !hasBound(context.supertraits, bound)
-                is Context.Impl -> false
+        val filteredBounds =
+            inferredBounds().filter { bound ->
+                when (context) {
+                    is Context.Trait -> hasDefault && !hasBound(context.supertraits, bound)
+                    is Context.Impl -> false
+                }
             }
-        }
-        val selfPredTokens = if (filteredBounds.isEmpty()) {
-            quote("Self: 'async_trait")
-        } else {
-            val boundTokens = TokenStream.new()
-            for (bound in filteredBounds) {
-                bound.toTokens(boundTokens)
-                Plus.default().toTokens(boundTokens)
+        val selfPredTokens =
+            if (filteredBounds.isEmpty()) {
+                quote("Self: 'async_trait")
+            } else {
+                val boundTokens = TokenStream.new()
+                for (bound in filteredBounds) {
+                    bound.toTokens(boundTokens)
+                    Plus.default().toTokens(boundTokens)
+                }
+                quote("Self: `#`bounds 'async_trait", "bounds" to boundTokens)
             }
-            quote("Self: `#`bounds 'async_trait", "bounds" to boundTokens)
-        }
         val predicate = parseQuoteWherePredicate(selfPredTokens)
         whereClauseOrDefault(sig.generics).predicates.push(predicate) { Comma.default() }
     }
@@ -254,21 +261,23 @@ private class SignatureTransformation(
         }
     }
 
-    private fun receiverType(): SynType? = when (val first = sig.inputs.firstOrNull()) {
-        is FnArg.Receiver -> first.type
-        is FnArg.Typed -> {
-            val pat = first.patType.pat
-            if (pat is Pat.Ident && pat.ident.toString() == "self") first.patType.ty else null
+    private fun receiverType(): SynType? =
+        when (val first = sig.inputs.firstOrNull()) {
+            is FnArg.Receiver -> first.type
+            is FnArg.Typed -> {
+                val pat = first.patType.pat
+                if (pat is Pat.Ident && pat.ident.toString() == "self") first.patType.ty else null
+            }
+            else -> null
         }
-        else -> null
-    }
 
     private fun transformInputs() {
         for ((index, arg) in sig.inputs.withIndex()) {
             when (arg) {
-                is FnArg.Receiver -> if (arg.reference == null) {
-                    arg.mutability = null
-                }
+                is FnArg.Receiver ->
+                    if (arg.reference == null) {
+                        arg.mutability = null
+                    }
                 is FnArg.Typed -> transformTypedInput(index, arg)
             }
         }
@@ -283,11 +292,12 @@ private class SignatureTransformation(
             } else {
                 val positional = positionalArg(index, pat)
                 val mutability = mutPat(pat)
-                val tokens = if (mutability != null) {
-                    quote("`#`mutability `#`pos", "mutability" to mutability, "pos" to positional)
-                } else {
-                    quote("`#`pos", "pos" to positional)
-                }
+                val tokens =
+                    if (mutability != null) {
+                        quote("`#`mutability `#`pos", "mutability" to mutability, "pos" to positional)
+                    } else {
+                        quote("`#`pos", "pos" to positional)
+                    }
                 arg.patType.pat = parseQuotePat(tokens)
             }
         }
@@ -323,11 +333,12 @@ private object GenericBounds {
             val bounds = param.bounds
             param.bounds = TypeParamBoundList()
             param.colonToken = null
-            val tokens = if (bounds.isEmpty()) {
-                quote("`#`name: 'async_trait", "name" to name)
-            } else {
-                quote("`#`name: 'async_trait + `#`bounds", "name" to name, "bounds" to bounds)
-            }
+            val tokens =
+                if (bounds.isEmpty()) {
+                    quote("`#`name: 'async_trait", "name" to name)
+                } else {
+                    quote("`#`name: 'async_trait + `#`bounds", "name" to name, "bounds" to bounds)
+                }
             whereClauseOrDefault(generics).predicates.push(parseQuoteWherePredicate(tokens)) { Comma.default() }
         } else {
             val bound = TypeParamBound.LifetimeBound(Lifetime.new("'async_trait", span))
@@ -342,11 +353,12 @@ private object GenericBounds {
             val bounds = param.bounds
             param.bounds = LifetimeList()
             param.colonToken = null
-            val tokens = if (bounds.isEmpty()) {
-                quote("`#`name: 'async_trait", "name" to name)
-            } else {
-                quote("`#`name: 'async_trait + `#`bounds", "name" to name, "bounds" to bounds)
-            }
+            val tokens =
+                if (bounds.isEmpty()) {
+                    quote("`#`name: 'async_trait", "name" to name)
+                } else {
+                    quote("`#`name: 'async_trait + `#`bounds", "name" to name, "bounds" to bounds)
+                }
             whereClauseOrDefault(generics).predicates.push(parseQuoteWherePredicate(tokens)) { Comma.default() }
         } else {
             param.bounds.push(Lifetime.new("'async_trait", span)) { Plus.default() }
@@ -384,23 +396,26 @@ private object BlockTransformation {
         val attrs = arg.patType.attrs.filter { it.path().isIdent("cfg") }
         val pat = arg.patType.pat
         return when (pat) {
-            is Pat.Ident -> quote(
-                "`#`(`#`attrs)* let `#`mutability `#`ident = `#`ident;",
-                "attrs" to attrs,
-                "mutability" to pat.mutability,
-                "ident" to pat.ident,
-            )
-            is Pat.Wild -> quote(
-                "`#`(`#`attrs)* let `#`ident = `#`ident;",
-                "attrs" to attrs,
-                "ident" to positionalArg(index, pat),
-            )
-            else -> quote(
-                "`#`(`#`attrs)* let `#`pat = { let `#`ident = `#`ident; `#`ident };",
-                "attrs" to attrs,
-                "pat" to pat,
-                "ident" to positionalArg(index, pat),
-            )
+            is Pat.Ident ->
+                quote(
+                    "`#`(`#`attrs)* let `#`mutability `#`ident = `#`ident;",
+                    "attrs" to attrs,
+                    "mutability" to pat.mutability,
+                    "ident" to pat.ident,
+                )
+            is Pat.Wild ->
+                quote(
+                    "`#`(`#`attrs)* let `#`ident = `#`ident;",
+                    "attrs" to attrs,
+                    "ident" to positionalArg(index, pat),
+                )
+            else ->
+                quote(
+                    "`#`(`#`attrs)* let `#`pat = { let `#`ident = `#`ident; `#`ident };",
+                    "attrs" to attrs,
+                    "pat" to pat,
+                    "ident" to positionalArg(index, pat),
+                )
         }
     }
 
@@ -409,20 +424,22 @@ private object BlockTransformation {
         output: ReturnType,
         block: Block,
         declarations: List<TokenStream>,
-    ): TokenStream = when (output) {
-        is ReturnType.Default -> quote(
-            "`#`(`#`decls)* let _: () = `#`block;",
-            "decls" to declarations,
-            "block" to block,
-        )
-        is ReturnType.TypeReturn -> {
-            if (containsAssociatedTypeImplTrait(context, output.ty)) {
-                associatedReturn(block, declarations)
-            } else {
-                explicitReturn(output.ty, block, declarations)
+    ): TokenStream =
+        when (output) {
+            is ReturnType.Default ->
+                quote(
+                    "`#`(`#`decls)* let _: () = `#`block;",
+                    "decls" to declarations,
+                    "block" to block,
+                )
+            is ReturnType.TypeReturn -> {
+                if (containsAssociatedTypeImplTrait(context, output.ty)) {
+                    associatedReturn(block, declarations)
+                } else {
+                    explicitReturn(output.ty, block, declarations)
+                }
             }
         }
-    }
 
     private fun associatedReturn(block: Block, declarations: List<TokenStream>): TokenStream =
         if (declarations.isEmpty()) {

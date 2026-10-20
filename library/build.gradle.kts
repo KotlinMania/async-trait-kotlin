@@ -204,38 +204,39 @@ rootProject.extensions.configure<YarnRootEnvSpec> {
 rootProject.extensions.configure<WasmYarnRootEnvSpec> {
     version = libs.versions.yarn.get()
 }
-val npmResolutions = mapOf(
-    "diff" to libs.versions.npmDiff.get(),
-    "fast-uri" to libs.versions.npmFastUri.get(),
-    "serialize-javascript" to libs.versions.npmSerializeJavascript.get(),
-    "webpack" to libs.versions.webpack.get(),
-    "follow-redirects" to libs.versions.npmFollowRedirects.get(),
-    "lodash" to libs.versions.npmLodash.get(),
-    "ajv" to libs.versions.npmAjv.get(),
-    "brace-expansion" to libs.versions.npmBraceExpansion.get(),
-    "flatted" to libs.versions.npmFlatted.get(),
-    "minimatch" to libs.versions.npmMinimatch.get(),
-    "picomatch" to libs.versions.npmPicomatch.get(),
-    "qs" to libs.versions.npmQs.get(),
-    "socket.io-parser" to libs.versions.npmSocketIoParser.get(),
-    "ws" to libs.versions.npmWs.get(),
-    "@types/estree" to libs.versions.npmTypesEstree.get(),
-    "@types/node" to libs.versions.npmTypesNode.get(),
-    "baseline-browser-mapping" to libs.versions.npmBaselineBrowserMapping.get(),
-    "caniuse-lite" to libs.versions.npmCaniuseLite.get(),
-    "electron-to-chromium" to libs.versions.npmElectronToChromium.get(),
-    "enhanced-resolve" to libs.versions.npmEnhancedResolve.get(),
-    "mime-db" to libs.versions.npmMimeDb.get(),
-    "node-releases" to libs.versions.npmNodeReleases.get(),
-    "terser" to libs.versions.npmTerser.get(),
-    "terser-webpack-plugin" to libs.versions.npmTerserWebpackPlugin.get(),
-    "webpack-sources" to libs.versions.npmWebpackSources.get(),
-    "ua-parser-js" to libs.versions.npmUaParserJs.get(),
-    "tmp" to libs.versions.npmTmp.get(),
-    "body-parser" to libs.versions.npmBodyParser.get(),
-    "js-yaml" to libs.versions.npmJsYaml.get(),
-    "browserslist" to libs.versions.npmBrowserslist.get(),
-)
+val npmResolutions =
+    mapOf(
+        "diff" to libs.versions.npmDiff.get(),
+        "fast-uri" to libs.versions.npmFastUri.get(),
+        "serialize-javascript" to libs.versions.npmSerializeJavascript.get(),
+        "webpack" to libs.versions.webpack.get(),
+        "follow-redirects" to libs.versions.npmFollowRedirects.get(),
+        "lodash" to libs.versions.npmLodash.get(),
+        "ajv" to libs.versions.npmAjv.get(),
+        "brace-expansion" to libs.versions.npmBraceExpansion.get(),
+        "flatted" to libs.versions.npmFlatted.get(),
+        "minimatch" to libs.versions.npmMinimatch.get(),
+        "picomatch" to libs.versions.npmPicomatch.get(),
+        "qs" to libs.versions.npmQs.get(),
+        "socket.io-parser" to libs.versions.npmSocketIoParser.get(),
+        "ws" to libs.versions.npmWs.get(),
+        "@types/estree" to libs.versions.npmTypesEstree.get(),
+        "@types/node" to libs.versions.npmTypesNode.get(),
+        "baseline-browser-mapping" to libs.versions.npmBaselineBrowserMapping.get(),
+        "caniuse-lite" to libs.versions.npmCaniuseLite.get(),
+        "electron-to-chromium" to libs.versions.npmElectronToChromium.get(),
+        "enhanced-resolve" to libs.versions.npmEnhancedResolve.get(),
+        "mime-db" to libs.versions.npmMimeDb.get(),
+        "node-releases" to libs.versions.npmNodeReleases.get(),
+        "terser" to libs.versions.npmTerser.get(),
+        "terser-webpack-plugin" to libs.versions.npmTerserWebpackPlugin.get(),
+        "webpack-sources" to libs.versions.npmWebpackSources.get(),
+        "ua-parser-js" to libs.versions.npmUaParserJs.get(),
+        "tmp" to libs.versions.npmTmp.get(),
+        "body-parser" to libs.versions.npmBodyParser.get(),
+        "js-yaml" to libs.versions.npmJsYaml.get(),
+        "browserslist" to libs.versions.npmBrowserslist.get(),
+    )
 listOf(
     rootProject.extensions.getByType<YarnRootExtension>(),
     rootProject.extensions.getByType<WasmYarnRootExtension>(),
@@ -255,6 +256,13 @@ listOf(
     node.versions.webpackCli.version = libs.versions.webpackCli.get()
     node.versions.webpack.version = libs.versions.webpack.get()
     node.versions.karmaWebpack.version = "file:${rootProject.file("gradle/npm/karma-webpack").invariantSeparatorsPath}"
+}
+
+rootProject.tasks.matching { it.name == "kotlinStoreYarnLock" }.configureEach {
+    dependsOn(rootProject.tasks.matching { it.name == "kotlinUpgradeYarnLock" })
+}
+rootProject.tasks.matching { it.name == "kotlinWasmStoreYarnLock" }.configureEach {
+    dependsOn(rootProject.tasks.matching { it.name == "kotlinWasmUpgradeYarnLock" })
 }
 
 val linuxArm64Binary =
@@ -370,10 +378,21 @@ val swiftTest =
         dependsOn("embedSwiftExportForXcode")
         workingDir = file("swift-test-harness")
         environment(
-            "SDK_NAME" to "macosx", "CONFIGURATION" to "Debug", "ARCHS" to "arm64",
-            "BUILT_PRODUCTS_DIR" to layout.buildDirectory.dir("swift-test").get().asFile.absolutePath,
-            "TARGET_BUILD_DIR" to layout.buildDirectory.dir("swift-test").get().asFile.absolutePath,
-            "FRAMEWORKS_FOLDER_PATH" to "Frameworks", "MACOSX_DEPLOYMENT_TARGET" to "15.0",
+            "SDK_NAME" to "macosx",
+            "CONFIGURATION" to "Debug",
+            "ARCHS" to "arm64",
+            "BUILT_PRODUCTS_DIR" to
+                layout.buildDirectory
+                    .dir("swift-test")
+                    .get()
+                    .asFile.absolutePath,
+            "TARGET_BUILD_DIR" to
+                layout.buildDirectory
+                    .dir("swift-test")
+                    .get()
+                    .asFile.absolutePath,
+            "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
+            "MACOSX_DEPLOYMENT_TARGET" to "15.0",
             "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
         )
         commandLine("swift", "test", "--parallel", "-Xswiftc", "-warnings-as-errors")
@@ -393,19 +412,27 @@ tasks.named("build") {
     setDependsOn(listOf(assemble, "ktlintCheck", "detekt"))
 }
 if (HostManager.hostIsMac) {
-    val verifyAppleArtifacts = tasks.register<Exec>("verifyAppleArtifacts") {
-        group = "verification"
-        description = "Checks compiled Apple framework architectures, platforms, headers and modules."
-        dependsOn("assemble${frameworkName}XCFramework")
-        val verifier = rootProject.file("verification/verify_apple_artifacts.py")
-        val frameworks = layout.buildDirectory.dir("XCFrameworks")
-        val receipt = layout.buildDirectory.file("reports/publication/apple-frameworks.json")
-        inputs.file(verifier)
-        inputs.dir(frameworks)
-        outputs.file(receipt)
-        commandLine("python3", verifier, frameworks.get().asFile,
-            "--module", frameworkName, "--receipt", receipt.get().asFile)
-    }
+    val verifyAppleArtifacts =
+        tasks.register<Exec>("verifyAppleArtifacts") {
+            group = "verification"
+            description = "Checks compiled Apple framework architectures, platforms, headers and modules."
+            dependsOn("assemble${frameworkName}XCFramework")
+            val verifier = rootProject.file("verification/verify_apple_artifacts.py")
+            val frameworks = layout.buildDirectory.dir("XCFrameworks")
+            val receipt = layout.buildDirectory.file("reports/publication/apple-frameworks.json")
+            inputs.file(verifier)
+            inputs.dir(frameworks)
+            outputs.file(receipt)
+            commandLine(
+                "python3",
+                verifier,
+                frameworks.get().asFile,
+                "--module",
+                frameworkName,
+                "--receipt",
+                receipt.get().asFile,
+            )
+        }
     tasks.named("build") { dependsOn(verifyAppleArtifacts) }
 }
 
@@ -498,7 +525,11 @@ val testAndroidPublicationVerifier =
         commandLine(
             "python3",
             testScript.asFile,
-            centralPortalBundle.get().archiveFile.get().asFile,
+            centralPortalBundle
+                .get()
+                .archiveFile
+                .get()
+                .asFile,
             "--group",
             project.group.toString(),
             "--module",
@@ -506,7 +537,10 @@ val testAndroidPublicationVerifier =
             "--version",
             project.version.toString(),
             "--scratch",
-            layout.buildDirectory.dir("publication-verifier-tests").get().asFile,
+            layout.buildDirectory
+                .dir("publication-verifier-tests")
+                .get()
+                .asFile,
         )
     }
 
@@ -548,7 +582,6 @@ tasks.register<Sync>("prepareAndroidPublicationVerification") {
     into(layout.buildDirectory.dir("verification-android-repository"))
 }
 
-
 val deploymentBundle = centralPortalBundle.flatMap { it.archiveFile }
 val verifyCentralPortalBundle =
     tasks.register<Exec>("verifyCentralPortalBundle") {
@@ -562,10 +595,19 @@ val verifyCentralPortalBundle =
         inputs.property("requireSignatures", signingKey.isPresent)
         outputs.file(receipt)
         commandLine(
-            "python3", verifier, deploymentBundle.get().asFile,
-            "--group", project.group.toString(), "--module", libraryName,
-            "--version", project.version.toString(), "--namespace", libraryNamespace,
-            "--receipt", receipt.get().asFile,
+            "python3",
+            verifier,
+            deploymentBundle.get().asFile,
+            "--group",
+            project.group.toString(),
+            "--module",
+            libraryName,
+            "--version",
+            project.version.toString(),
+            "--namespace",
+            libraryNamespace,
+            "--receipt",
+            receipt.get().asFile,
         )
         if (signingKey.isPresent) args("--require-signatures")
     }
