@@ -395,7 +395,18 @@ val swiftTest =
             "MACOSX_DEPLOYMENT_TARGET" to "15.0",
             "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
         )
-        commandLine("swift", "test", "--parallel", "-Xswiftc", "-warnings-as-errors")
+        commandLine(
+            "swift",
+            "test",
+            "--verbose",
+            "--parallel",
+            "-Xswiftc",
+            "-swift-version",
+            "-Xswiftc",
+            "6",
+            "-Xswiftc",
+            "-warnings-as-errors",
+        )
     }
 
 tasks.register("test") {

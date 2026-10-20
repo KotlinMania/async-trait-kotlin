@@ -3,8 +3,11 @@ import AsyncTrait
 
 @Suite("AsyncTrait Swift Export Suite")
 struct AsyncTraitExportTests {
-    @Test("Swift module loads cleanly")
+    @Test("Exported arguments preserve their local setting")
     func swiftModuleLoads() {
-        #expect(Bool(true), "AsyncTrait swift module imported cleanly")
+        let send = Args(local: false)
+        let local = Args(local: true)
+        #expect(!send.local)
+        #expect(local.local)
     }
 }

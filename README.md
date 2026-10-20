@@ -124,7 +124,10 @@ DEPLOYMENT_TARGET_SETTING_NAME=MACOSX_DEPLOYMENT_TARGET \
 
 The Swift tests import the generated `AsyncTrait` module and exercise real
 expansion and diagnostics, including malformed trait and implementation bodies.
-Kotlin and Swift warnings are build failures. Full local KMP validation is the
+The Swift test command passes `-swift-version 6` and `-warnings-as-errors`
+through SwiftPM to the harness and its source dependencies. Verbose compiler
+commands record the effective language mode for validation. Kotlin and Swift
+warnings are build failures. Full local KMP validation is the
 primary gate before consumer CI or release; individual platform checks do not
 replace it.
 
