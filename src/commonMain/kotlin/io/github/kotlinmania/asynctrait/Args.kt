@@ -42,12 +42,12 @@ private fun tryParse(input: ParseStream): SynResult<Args> {
     }
     val questionResult = QuestionParse.parse(input)
     if (questionResult is SynResult.Failure) {
-        return SynResult.success(Args(local = false))
+        return SynResult.failure(questionResult.error)
     }
     val (_, sendParse) = customKeyword("Send")
     val sendResult = sendParse.parse(input)
     if (sendResult is SynResult.Failure) {
-        return SynResult.success(Args(local = false))
+        return SynResult.failure(sendResult.error)
     }
     return SynResult.success(Args(local = true))
 }

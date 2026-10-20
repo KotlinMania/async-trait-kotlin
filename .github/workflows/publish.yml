@@ -80,3 +80,14 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+
+      - name: Upload publication and executed consumer test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-publication-verification
+          path: |
+            build/reports/publication/
+            verification/android-consumer/build/reports/publication/
+            verification/android-consumer/build/test-results/
+          if-no-files-found: error

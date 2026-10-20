@@ -819,11 +819,34 @@ publishing.publications.withType<MavenPublication>().configureEach {
     centralPortalBundle.configure { include("$publicationDirectory/**") }
 }
 
+val testAndroidPublicationVerifier =
+    tasks.register<Exec>("testAndroidPublicationVerifier") {
+        group = "verification"
+        description = "Exercises Android publication acceptance and invalid-payload rejection against the actual bundle."
+        dependsOn(centralPortalBundle)
+        val testScript = layout.projectDirectory.file("verification/test_android_publication.py")
+        val verifier = layout.projectDirectory.file("verification/verify_android_publication.py")
+        inputs.files(testScript, verifier, centralPortalBundle.flatMap { it.archiveFile })
+        commandLine(
+            "python3",
+            testScript.asFile,
+            centralPortalBundle.get().archiveFile.get().asFile,
+            "--group",
+            project.group.toString(),
+            "--module",
+            publishProjectName,
+            "--version",
+            project.version.toString(),
+            "--scratch",
+            layout.buildDirectory.dir("publication-verifier-tests").get().asFile,
+        )
+    }
+
 val verifyAndroidPublication =
     tasks.register<Exec>("verifyAndroidPublication") {
         group = "verification"
         description = "Verifies the Android AAR, POM and metadata in the actual Central bundle."
-        dependsOn(centralPortalBundle)
+        dependsOn(centralPortalBundle, testAndroidPublicationVerifier)
         val verifier = layout.projectDirectory.file("verification/verify_android_publication.py")
         val bundle = centralPortalBundle.flatMap { it.archiveFile }
         val receipt = layout.buildDirectory.file("reports/publication/android.json")

@@ -45,8 +45,9 @@ ANDROID_HOME="$PWD/.android-sdk" ./gradlew -p verification/android-consumer \
 ```
 
 The separate consumer resolves only the verified bundle's Async Trait
-publications, checks selection of the Android AAR, and compiles calls to the
-public token API. Dependencies still resolve from their published repositories.
+publications, checks selection of the Android AAR, and compiles and executes
+Android host tests of the public token API. Dependencies still resolve from
+their published repositories.
 The Android workflow and publication dry run include these checks. Upload to
 Central also requires the bundle check. These focused checks accompany the
 full build, tests and strict Swift validation required for release.
