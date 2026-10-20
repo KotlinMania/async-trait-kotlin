@@ -16,7 +16,3 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "async-trait-kotlin"
-
-// The Android target builds in its own project so the Android Gradle Plugin is
-// applied there and not to the root project.
-include(":android")

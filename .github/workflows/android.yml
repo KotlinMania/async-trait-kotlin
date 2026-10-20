@@ -29,9 +29,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build Android target
-        # android/build.gradle.kts: the AAR and the host and device test packages.
-        run: ./gradlew :android:build --no-configuration-cache
+        # build.gradle.kts defines buildAndroid: compiles and assembles every target; runs no tests.
+        run: ./gradlew buildAndroid --no-configuration-cache
 
       - name: Test Android target
-        # android/build.gradle.kts: host tests, then device tests on the managed emulator.
-        run: ./gradlew :android:test --no-configuration-cache
+        # build.gradle.kts defines testAndroid: host tests, then device tests on the managed emulator.
+        run: ./gradlew testAndroid --no-configuration-cache
