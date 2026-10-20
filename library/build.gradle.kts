@@ -33,7 +33,7 @@ import java.util.Base64
 import java.util.UUID
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)

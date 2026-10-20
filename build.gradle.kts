@@ -1,7 +1,7 @@
 plugins {
     base
     alias(libs.plugins.android.kotlin.multiplatform.library) apply false
-    alias(libs.plugins.kotlinMultiplatform) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.ktlint) apply false
 }
