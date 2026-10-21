@@ -735,16 +735,16 @@ afterEvaluate {
             val compileCfgName = "${name}CompileClasspath"
             val runtimeCfgName = "${name}RuntimeClasspath"
             val compileCfg = configurations.findByName(compileCfgName) ?: configurations.create(compileCfgName)
-            compileCfg.isCanBeResolved = true
-            compileCfg.isCanBeConsumed = false
             if (compileCfg != compileBacking) {
+                compileCfg.isCanBeResolved = true
+                compileCfg.isCanBeConsumed = false
                 compileCfg.extendsFrom(compileBacking)
                 copyAttributes(compileBacking.attributes, compileCfg.attributes)
             }
             val runtimeCfg = configurations.findByName(runtimeCfgName) ?: configurations.create(runtimeCfgName)
-            runtimeCfg.isCanBeResolved = true
-            runtimeCfg.isCanBeConsumed = false
             if (runtimeBacking != null && runtimeCfg != runtimeBacking) {
+                runtimeCfg.isCanBeResolved = true
+                runtimeCfg.isCanBeConsumed = false
                 runtimeCfg.extendsFrom(runtimeBacking)
                 copyAttributes(runtimeBacking.attributes, runtimeCfg.attributes)
             }
@@ -1208,12 +1208,17 @@ kotlin.targets.configureEach {
             assemble.configure { dependsOn(compilationOutputs) }
         }
         if (this is KotlinJsCompilation) {
+            val isTestCompilation = name == "test"
             binaries.configureEach {
                 val link = linkTask
                 assemble.configure { dependsOn(link) }
                 if (target.wasmTargetType != KotlinWasmTargetType.WASI) {
                     val sync = linkSyncTask
-                    assemble.configure { dependsOn(sync) }
+                    if (isTestCompilation && mode == KotlinJsBinaryMode.PRODUCTION) {
+                        sync.configure { enabled = false }
+                    } else {
+                        assemble.configure { dependsOn(sync) }
+                    }
                 }
                 if (this is WasmBinary && mode == KotlinJsBinaryMode.PRODUCTION) {
                     val optimize = optimizeTask
