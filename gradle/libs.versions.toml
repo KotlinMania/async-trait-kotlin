@@ -3,6 +3,7 @@ agp = "9.4.1"
 android-compileSdk = "36"
 android-minSdk = "24"
 kotlin = "2.4.21"
+intellijCoroutines = "1.10.2-intellij-1"
 synKotlin = "0.3.12"
 procMacro2 = "0.1.6"
 procMacro = "0.1.4"
@@ -59,11 +60,11 @@ tracing = "0.1.0"
 
 [plugins]
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+android-kmp = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidKmp" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-android-kmp = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidKmp" }
 kotlinx-benchmark = { id = "org.jetbrains.kotlinx.benchmark", version.ref = "kotlinxBenchmark" }
 kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "kotlin" }
 
@@ -75,6 +76,8 @@ syn-kotlin = { module = "io.github.kotlinmania:syn-kotlin", version.ref = "synKo
 proc-macro2-kotlin = { module = "io.github.kotlinmania:proc-macro2-kotlin", version.ref = "procMacro2" }
 quote-kotlin = { module = "io.github.kotlinmania:quote-kotlin", version.ref = "quote" }
 android-test-runner = { module = "androidx.test:runner", version.ref = "androidTestRunner" }
+swift-export-embeddable = { module = "org.jetbrains.kotlin:swift-export-embeddable", version.ref = "kotlin" }
+intellij-coroutines-core-jvm = { module = "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core-jvm", version.ref = "intellijCoroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }

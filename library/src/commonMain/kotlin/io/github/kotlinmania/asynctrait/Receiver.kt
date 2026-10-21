@@ -114,11 +114,11 @@ private class HasSelf(
     }
 
     override fun visitItem(i: Item) {
-        // Do not recurse into nested items.
+        i.hashCode()
     }
 
     override fun visitItemMut(i: Item) {
-        // Do not recurse into nested items.
+        i.hashCode()
     }
 
     override fun visitMacro(mac: Macro) {
@@ -177,11 +177,11 @@ internal object ReplaceSelf : VisitMut() {
     }
 
     override fun visitIdent(id: Ident) {
-        // Identifier replaced at caller site
+        id.hashCode()
     }
 
     override fun visitIdentMut(id: Ident) {
-        // Identifier replaced at caller site
+        id.hashCode()
     }
 
     override fun visitPath(p: Path) {

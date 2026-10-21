@@ -73,7 +73,7 @@ struct AsyncTraitTests {
         )
         let result = parseArgs(tokens: tokens)
         let diagnostic = try #require(result.error)
-        let message: String = diagnostic.message
+        let message: String = try #require(diagnostic.message)
         #expect(message.contains("expected"))
         #expect(result.value == nil)
 
@@ -83,7 +83,7 @@ struct AsyncTraitTests {
         )
         let expansion = asyncTrait(args: tokens, input: source)
         let expansionDiagnostic = try #require(expansion.error)
-        let expansionMessage: String = expansionDiagnostic.message
+        let expansionMessage: String = try #require(expansionDiagnostic.message)
         #expect(expansionMessage.contains("expected"))
         #expect(expansion.value == nil)
     }

@@ -2,9 +2,7 @@ package io.github.kotlinmania.asynctrait
 
 import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.quote.quote
-import io.github.kotlinmania.syn.TokenStreamParseResult
 import io.github.kotlinmania.syn.parse2
-import io.github.kotlinmania.syn.toTokenStreamParseResult
 
 /**
  * Type erasure macro for asynchronous trait methods.
