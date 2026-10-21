@@ -99,8 +99,13 @@ Building a test executable is not counted as executing its tests.
 
 JavaScript and Wasm/JS browser tests use Chrome Headless. Node runs JavaScript,
 Wasm/JS and Wasm/WASI tests. Apple simulator tests require an installed runtime
-and device for each of iOS, tvOS and watchOS. Linux ARM64 and Windows tests must
-run on those hosts; a skipped runner is not successful platform validation.
+and device for each of iOS, tvOS and watchOS. Windows tests must run on Windows. Linux ARM64 tests are cross-linked on
+Linux x64 with `:library:prepareLinuxArm64Test`, then the exact hashed AArch64
+executable runs on the Linux ARM64 CI host. Kotlin/Native does not provide a
+Linux ARM64 compiler host. The runtime guard verifies the real host, ELF
+architecture, artifact hash and complete nonempty test results; raw output,
+JSON and JUnit reports are retained. A skipped runner is not successful
+platform validation.
 
 For Android Native, set `ANDROID_SERIAL_ARM64` and/or `ANDROID_SERIAL_X64` to
 connected devices reported by `adb devices`. The `androidNativeArm64Test` and

@@ -17,13 +17,11 @@ import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootExtension
 import org.jetbrains.kotlin.konan.target.HostManager
-import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -270,17 +268,12 @@ val linuxArm64Binary =
         .getByName<KotlinNativeTarget>("linuxArm64")
         .binaries
         .getTest(NativeBuildType.DEBUG)
-val linuxArm64Test =
-    tasks.register<KotlinNativeHostTest>("linuxArm64Test") {
-        group = "verification"
-        description = "Executes the Linux ARM64 test binary on a Linux ARM64 host."
-        dependsOn(linuxArm64Binary.linkTaskProvider)
-        executable = linuxArm64Binary.outputFile
-        targetName = "linuxArm64"
-        enabled = HostManager.host == KonanTarget.LINUX_ARM64
-    }
-tasks.named("allTests") {
-    dependsOn(linuxArm64Test)
+tasks.register<Sync>("prepareLinuxArm64Test") {
+    group = "verification"
+    description = "Stages the cross-linked Linux ARM64 tests for execution on an ARM64 runner."
+    dependsOn(linuxArm64Binary.linkTaskProvider)
+    from(linuxArm64Binary.outputFile) { rename { "test.kexe" } }
+    into(layout.buildDirectory.dir("linux-arm64-test"))
 }
 
 val adb = extensions.getByType<KotlinMultiplatformAndroidComponentsExtension>().sdkComponents.adb

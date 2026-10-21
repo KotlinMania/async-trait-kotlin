@@ -64,9 +64,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            tasks: ':library:build :library:allTests'
-          - os: ubuntu-24.04-arm
-            tasks: ':library:compileKotlinLinuxArm64 :library:linuxArm64Test'
+            tasks: ':library:build :library:allTests :library:prepareLinuxArm64Test'
           - os: windows-latest
             tasks: ':library:build :library:mingwX64Test'
     runs-on: ${{ matrix.os }}
@@ -81,6 +79,16 @@ jobs:
       - name: Compile and execute tests on their native host
         shell: bash
         run: ./gradlew ${{ matrix.tasks }} --continue --no-configuration-cache --console=plain --no-daemon --max-workers=2
+      - name: Hash the cross-linked Linux ARM64 executable
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: library/build/linux-arm64-test
+        run: sha256sum test.kexe > test.kexe.sha256
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: linux-arm64-tests-${{ github.sha }}
+          path: library/build/linux-arm64-test/
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -88,6 +96,30 @@ jobs:
           path: |
             library/build/reports
             library/build/test-results
+
+  linux-arm64-runtime:
+    needs: native-hosts
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: linux-arm64-tests-${{ github.sha }}
+          path: library/build/linux-arm64-test
+      - name: Check Native execution evidence guards
+        run: python3 verification/test_linux_arm64_runner.py
+      - name: Execute the exact cross-linked binary on Linux ARM64
+        run: >-
+          python3 verification/run_linux_arm64_tests.py
+          library/build/linux-arm64-test/test.kexe
+          --revision '${{ github.sha }}'
+          --reports library/build/reports/linux-arm64-runtime
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: linux-arm64-runtime-results
+          path: library/build/reports/linux-arm64-runtime/
+          if-no-files-found: error
 
   android-x64:
     runs-on: ubuntu-latest
