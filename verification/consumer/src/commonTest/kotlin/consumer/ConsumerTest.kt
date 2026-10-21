@@ -27,7 +27,7 @@ class ConsumerTest {
         val source = "trait Trait { fn broken() { 1 + } }"
         val result = asyncTrait(quote(""), quote(source))
         val diagnostic = assertNotNull(result.exceptionOrNull())
-        val message: String = diagnostic.message
+        val message: String = assertNotNull(diagnostic.message)
         assertTrue(message.isNotEmpty())
 
         val expansion = expandAsyncTrait("", source)
@@ -54,7 +54,7 @@ class ConsumerTest {
 
         val failure = parseArgs(quote("?Sync"))
         assertNull(failure.value)
-        val message: String = assertNotNull(failure.error).message
+        val message: String = assertNotNull(assertNotNull(failure.error).message)
         assertTrue(message.contains("expected"))
     }
 }
