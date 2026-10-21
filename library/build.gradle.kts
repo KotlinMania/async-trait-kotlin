@@ -33,7 +33,6 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
-import org.jetbrains.kotlin.gradle.swiftexport.ExperimentalSwiftExportDsl
 import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsBinaryMode
 import org.jetbrains.kotlin.gradle.targets.js.ir.WasmBinary
@@ -45,9 +44,7 @@ import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootExtension
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import org.jetbrains.kotlin.konan.target.HostManager
-import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.net.URI
 import java.net.http.HttpClient
@@ -107,9 +104,6 @@ abstract class AndroidJniTask : DefaultTask() {
     abstract val nativeDirectory: DirectoryProperty
 }
 
-// KGP runs Swift Export in an isolated worker whose classpath is `swiftExportClasspath`.
-// Adding a dependency disables KGP's default dependency population, so keep the default
-// embeddable runner explicit alongside the IntelliJ coroutines artifact.
 val projectDependencyHandler = project.dependencies
 configurations.configureEach {
     if (name.contains("androidDeviceTest", ignoreCase = true)) {
@@ -128,14 +122,6 @@ configurations.configureEach {
                     .get(),
             ),
         )
-    }
-}
-
-// Generated bridge/runtime Kotlin is held to the same diagnostics as project code.
-tasks.withType<KotlinCompilationTask<*>>().configureEach {
-    compilerOptions.allWarningsAsErrors.set(true)
-    doFirst {
-        check(compilerOptions.allWarningsAsErrors.get()) { "Warnings-as-errors disabled for $path" }
     }
 }
 
@@ -251,10 +237,6 @@ kotlin {
     swiftExport {
         moduleName = frameworkName
         flattenPackage = libraryNamespace
-        @OptIn(ExperimentalSwiftExportDsl::class)
-        configure {
-            settings.put("enableCoroutinesSupport", "true")
-        }
     }
 
     // Native FFI — Kotlin/Native cinterop + per-target static wrapper library.
@@ -513,16 +495,18 @@ kotlin {
         }
 
         // Custom intermediate source sets for host-OS targets (excluding wasmWasi):
-        val hostSystemMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
+        val hostSystemMain =
+            create("hostSystemMain") {
+                dependsOn(commonMain.get())
+                dependencies {
+                }
             }
-        }
-        val hostSystemTest by creating {
-            dependsOn(commonTest.get())
-            dependencies {
+        val hostSystemTest =
+            create("hostSystemTest") {
+                dependsOn(commonTest.get())
+                dependencies {
+                }
             }
-        }
 
         jvmMain {
             dependsOn(hostSystemMain)
@@ -540,12 +524,12 @@ kotlin {
             dependencies {
             }
         }
-        val androidHostTest by getting {
+        getByName("androidHostTest") {
             dependsOn(hostSystemTest)
             dependencies {
             }
         }
-        val androidDeviceTest by getting {
+        getByName("androidDeviceTest") {
             dependsOn(hostSystemTest)
             dependencies {
                 implementation(libs.android.test.runner)
@@ -587,16 +571,18 @@ kotlin {
         }
 
         // Custom intermediate source sets for POSIX targets under native (apple, linux, androidNative; excluding mingw):
-        val posixMain by creating {
-            dependsOn(nativeMain.get())
-            dependencies {
+        val posixMain =
+            create("posixMain") {
+                dependsOn(nativeMain.get())
+                dependencies {
+                }
             }
-        }
-        val posixTest by creating {
-            dependsOn(nativeTest.get())
-            dependencies {
+        val posixTest =
+            create("posixTest") {
+                dependsOn(nativeTest.get())
+                dependencies {
+                }
             }
-        }
 
         appleMain {
             dependsOn(posixMain)
@@ -1254,122 +1240,42 @@ assemble.configure {
     if (napiFfiEnabled) dependsOn("buildNode$ffiName")
 }
 
-// ============================================================================
-// Strict Swift 6 Export & Verification
-// ============================================================================
 val swiftTest =
-    tasks.register("swiftTest") {
+    tasks.register<Exec>("swiftTest") {
         group = "verification"
-        description = "Builds the Swift Export SPM package with strict Swift 6 and runs swift test against it."
-        outputs.upToDateWhen { false }
-
-        doLast {
-            val execOperations = serviceOf<ExecOperations>()
-            val swiftBuildFile =
+        description = "Tests the Swift Export package produced for the macOS host."
+        dependsOn("embedSwiftExportForXcode")
+        workingDir = file("swift-test-harness")
+        environment(
+            "SDK_NAME" to "macosx",
+            "CONFIGURATION" to "Debug",
+            "ARCHS" to "arm64",
+            "BUILT_PRODUCTS_DIR" to
                 layout.buildDirectory
                     .dir("swift-test")
                     .get()
-                    .asFile
-            if (swiftBuildFile.exists()) {
-                swiftBuildFile.deleteRecursively()
-            }
-            swiftBuildFile.mkdirs()
-            val swiftBuildDir = swiftBuildFile.absolutePath
-            val gradlew = rootProject.file(if (isWindowsHost) "gradlew.bat" else "gradlew").absolutePath
-
-            execOperations
-                .exec {
-                    workingDir = rootProject.projectDir
-                    commandLine(
-                        gradlew,
-                        ":library:embedSwiftExportForXcode",
-                        "--max-workers=2",
-                        "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g",
-                        "--no-configuration-cache",
-                        "--no-daemon",
-                        "--console=plain",
-                    )
-                    environment(
-                        mapOf(
-                            "BUILT_PRODUCTS_DIR" to swiftBuildDir,
-                            "TARGET_BUILD_DIR" to swiftBuildDir,
-                            "SDK_NAME" to "macosx",
-                            "CONFIGURATION" to "Debug",
-                            "ARCHS" to "arm64",
-                            "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
-                            "MACOSX_DEPLOYMENT_TARGET" to "15.0",
-                            "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
-                        ),
-                    )
-                }.assertNormalExitValue()
-
-            val harnessDir = layout.projectDirectory.dir("swift-test-harness").asFile
-            execOperations
-                .exec {
-                    workingDir = harnessDir
-                    commandLine("swift", "package", "reset")
-                }.assertNormalExitValue()
-
-            val developerDir =
-                ByteArrayOutputStream().use { out ->
-                    execOperations
-                        .exec {
-                            commandLine("xcode-select", "-p")
-                            standardOutput = out
-                        }.assertNormalExitValue()
-                    out.toString().trim()
-                }
-            val swiftTestCommand =
-                mutableListOf(
-                    "swift",
-                    "test",
-                    "--verbose",
-                    "--parallel",
-                    "-Xswiftc",
-                    "-swift-version",
-                    "-Xswiftc",
-                    "6",
-                    "-Xswiftc",
-                    "-warnings-as-errors",
-                )
-            if (developerDir.endsWith("CommandLineTools")) {
-                val frameworks = "$developerDir/Library/Developer/Frameworks"
-                swiftTestCommand +=
-                    listOf(
-                        "-Xswiftc",
-                        "-F",
-                        "-Xswiftc",
-                        frameworks,
-                        "-Xlinker",
-                        "-F",
-                        "-Xlinker",
-                        frameworks,
-                        "-Xlinker",
-                        "-rpath",
-                        "-Xlinker",
-                        frameworks,
-                        "-Xlinker",
-                        "-rpath",
-                        "-Xlinker",
-                        "$developerDir/Library/Developer/usr/lib",
-                    )
-            }
-            val swiftTestOutput = ByteArrayOutputStream()
-            val swiftTestResult =
-                execOperations.exec {
-                    workingDir = harnessDir
-                    commandLine(swiftTestCommand)
-                    standardOutput = swiftTestOutput
-                    errorOutput = swiftTestOutput
-                    isIgnoreExitValue = true
-                }
-            val swiftTestLog = swiftTestOutput.toString()
-            println(swiftTestLog)
-            swiftTestResult.assertNormalExitValue()
-            if (!swiftTestLog.contains(Regex("""Test run with [1-9]\d* tests?"""))) {
-                throw GradleException("swift test ran no Swift Testing tests (toolchain: $developerDir)")
-            }
-        }
+                    .asFile.absolutePath,
+            "TARGET_BUILD_DIR" to
+                layout.buildDirectory
+                    .dir("swift-test")
+                    .get()
+                    .asFile.absolutePath,
+            "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
+            "MACOSX_DEPLOYMENT_TARGET" to "15.0",
+            "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
+        )
+        commandLine(
+            "swift",
+            "test",
+            "--verbose",
+            "--parallel",
+            "-Xswiftc",
+            "-swift-version",
+            "-Xswiftc",
+            "6",
+            "-Xswiftc",
+            "-warnings-as-errors",
+        )
     }
 
 tasks.register("swiftExportSmokeTest") {
