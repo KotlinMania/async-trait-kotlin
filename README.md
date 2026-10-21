@@ -32,7 +32,7 @@ simulator ARM64. There are no 32-bit or Apple x64 targets.
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotlinmania:async-trait-kotlin:0.1.2")
+    implementation("io.github.kotlinmania:async-trait-kotlin:0.1.3")
 }
 ```
 
