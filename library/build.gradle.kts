@@ -2,6 +2,12 @@ import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtensi
 import dev.detekt.gradle.Detekt
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
+import io.github.kotlinmania.build.AndroidPublicationRegressionVerifier
+import io.github.kotlinmania.build.AndroidPublicationVerifier
+import io.github.kotlinmania.build.AppleArtifactsVerifier
+import io.github.kotlinmania.build.BuildToolTask
+import io.github.kotlinmania.build.NodeFfiBuilder
+import io.github.kotlinmania.build.PublicationBundleVerifier
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.attributes.Attribute
@@ -1049,16 +1055,64 @@ if (jvmFfiEnabled) {
 // N-API — JS/WASM C bindings. Gated by project.ffi.napi=true.
 // ============================================================================
 if (napiFfiEnabled) {
-    val buildNodeFfi =
-        tasks.register<Exec>("buildNode$ffiName") {
+    val nodeExecutable = rootProject.extensions.getByType<NodeJsEnvSpec>().executable
+    val installNodeFfiHeaders =
+        tasks.register<Exec>("installNode$ffiName" + "Headers") {
             group = "build"
-            description = "Builds the native node-$ffiNameLower N-API addon via node-gyp"
+            description = "Installs the N-API C++ header dependency with package scripts disabled."
+            dependsOn(rootProject.tasks.named("kotlinNodeJsSetup"))
             workingDir = file(ffiNapiDir)
-            if (isWindowsHost) {
-                commandLine("cmd", "/c", "npm install --ignore-scripts && npx node-gyp configure && npx node-gyp build")
-            } else {
-                commandLine("sh", "-c", "npm install --ignore-scripts && npx node-gyp configure && npx node-gyp build")
+            doFirst {
+                val node = File(nodeExecutable.get())
+                val npm =
+                    if (System.getProperty("os.name").startsWith("Windows")) {
+                        File(node.parentFile, "node_modules/npm/bin/npm-cli.js")
+                    } else {
+                        File(node.parentFile.parentFile, "lib/node_modules/npm/bin/npm-cli.js")
+                    }
+                val scratch =
+                    layout.buildDirectory
+                        .dir("tmp/node-ffi-npm")
+                        .get()
+                        .asFile
+                        .apply { mkdirs() }
+                environment("TMPDIR", scratch.absolutePath)
+                environment("TMP", scratch.absolutePath)
+                environment("TEMP", scratch.absolutePath)
+                commandLine(
+                    listOf(
+                        node.absolutePath,
+                        npm.absolutePath,
+                        if (file("$ffiNapiDir/package-lock.json").isFile) "ci" else "install",
+                        "--ignore-scripts",
+                        "--omit=dev",
+                        "--no-audit",
+                        "--no-fund",
+                    ) +
+                        if (gradle.startParameter.isOffline) listOf("--offline") else emptyList(),
+                )
             }
+        }
+    val buildNodeFfi =
+        tasks.register<BuildToolTask>("buildNode$ffiName") {
+            group = "build"
+            description = "Builds the native node-$ffiNameLower N-API addon with its declared binding settings."
+            dependsOn(installNodeFfiHeaders)
+            toolClass.set(NodeFfiBuilder::class.java.name)
+            arguments.addAll(
+                "--project-dir",
+                projectDir.absolutePath,
+                "--addon-dir",
+                file(ffiNapiDir).absolutePath,
+                "--build-dir",
+                layout.buildDirectory
+                    .get()
+                    .asFile.absolutePath,
+                "--node-version",
+                libs.versions.node.get(),
+            )
+            arguments.addAll(nodeExecutable.map { listOf("--node", it) })
+            if (gradle.startParameter.isOffline) arguments.add("--offline")
         }
 
     val nodeHostPlatform =
@@ -1245,30 +1299,66 @@ assemble.configure {
     if (napiFfiEnabled) dependsOn("buildNode$ffiName")
 }
 
+// kotlinmania:async-trait-local-swift-export:v1 begin
+val localSwiftBuildDir = layout.buildDirectory.dir("swift-test")
+val localSwiftTemporaryDir = layout.buildDirectory.dir("tmp/local-swift-export")
+val strictSwiftConfiguration = rootProject.layout.projectDirectory.file("verification/strict-swift.xcconfig")
+val localSwiftEnvironment =
+    mapOf(
+        "SDK_NAME" to "macosx",
+        "CONFIGURATION" to "Debug",
+        "ARCHS" to "arm64",
+        "BUILT_PRODUCTS_DIR" to localSwiftBuildDir.get().asFile.absolutePath,
+        "TARGET_BUILD_DIR" to localSwiftBuildDir.get().asFile.absolutePath,
+        "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
+        "MACOSX_DEPLOYMENT_TARGET" to "15.0",
+        "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
+        "XCODE_XCCONFIG_FILE" to strictSwiftConfiguration.asFile.absolutePath,
+        "TMPDIR" to localSwiftTemporaryDir.get().asFile.absolutePath,
+        "TMP" to localSwiftTemporaryDir.get().asFile.absolutePath,
+        "TEMP" to localSwiftTemporaryDir.get().asFile.absolutePath,
+    )
+val prepareSwiftExportForLocalTests =
+    tasks.register<Exec>("prepareSwiftExportForLocalTests") {
+        group = "verification"
+        description = "Builds the actual Swift Export package in a child Gradle invocation with its required Xcode context."
+        inputs.file(strictSwiftConfiguration)
+        outputs.upToDateWhen { false }
+        workingDir = rootProject.projectDir
+        val exportCommand =
+            mutableListOf(
+                rootProject.file("gradlew").absolutePath,
+                "${project.path}:embedSwiftExportForXcode",
+                "--no-configuration-cache",
+                "--no-daemon",
+                "--console=plain",
+                "--max-workers=${gradle.startParameter.maxWorkerCount}",
+                "--project-cache-dir",
+                layout.buildDirectory
+                    .dir("gradle-local-swift-export")
+                    .get()
+                    .asFile.absolutePath,
+            )
+        if (gradle.startParameter.isOffline) exportCommand += "--offline"
+        gradle.startParameter.projectProperties.forEach { (key, value) -> exportCommand += "-P$key=$value" }
+        gradle.startParameter.systemPropertiesArgs["maven.repo.local"]?.let { exportCommand += "-Dmaven.repo.local=$it" }
+        commandLine(exportCommand)
+        environment(localSwiftEnvironment)
+        doFirst {
+            check(HostManager.hostIsMac) { "Local Swift Export tests require macOS and Xcode" }
+            localSwiftBuildDir.get().asFile.mkdirs()
+            localSwiftTemporaryDir.get().asFile.mkdirs()
+        }
+    }
+// kotlinmania:async-trait-local-swift-export:v1 end
+
 val swiftTest =
     tasks.register<Exec>("swiftTest") {
         group = "verification"
         description = "Tests the Swift Export package produced for the macOS host."
-        dependsOn("embedSwiftExportForXcode")
+        dependsOn(prepareSwiftExportForLocalTests)
         workingDir = file("swift-test-harness")
-        environment(
-            "SDK_NAME" to "macosx",
-            "CONFIGURATION" to "Debug",
-            "ARCHS" to "arm64",
-            "BUILT_PRODUCTS_DIR" to
-                layout.buildDirectory
-                    .dir("swift-test")
-                    .get()
-                    .asFile.absolutePath,
-            "TARGET_BUILD_DIR" to
-                layout.buildDirectory
-                    .dir("swift-test")
-                    .get()
-                    .asFile.absolutePath,
-            "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
-            "MACOSX_DEPLOYMENT_TARGET" to "15.0",
-            "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
-        )
+        environment(localSwiftEnvironment)
         commandLine(
             "swift",
             "test",
@@ -1306,24 +1396,25 @@ tasks.named("build") {
 }
 if (HostManager.hostIsMac) {
     val verifyAppleArtifacts =
-        tasks.register<Exec>("verifyAppleArtifacts") {
+        tasks.register<BuildToolTask>("verifyAppleArtifacts") {
             group = "verification"
             description = "Checks compiled Apple framework architectures, platforms, headers and modules."
             dependsOn("assemble${frameworkName}XCFramework")
-            val verifier = rootProject.file("verification/verify_apple_artifacts.py")
+
             val frameworks = layout.buildDirectory.dir("XCFrameworks")
             val receipt = layout.buildDirectory.file("reports/publication/apple-frameworks.json")
-            inputs.file(verifier)
+            inputs.files(rootProject.fileTree("buildSrc/src/main/java"))
             inputs.dir(frameworks)
             outputs.file(receipt)
-            commandLine(
-                "python3",
-                verifier,
-                frameworks.get().asFile,
-                "--module",
-                frameworkName,
-                "--receipt",
-                receipt.get().asFile,
+            toolClass.set(AppleArtifactsVerifier::class.java.name)
+            arguments.addAll(
+                listOf(
+                    frameworks.get().asFile,
+                    "--module",
+                    frameworkName,
+                    "--receipt",
+                    receipt.get().asFile,
+                ).map { it.toString() },
             )
         }
     tasks.named("build") { dependsOn(verifyAppleArtifacts) }
@@ -1408,58 +1499,61 @@ publishing.publications.withType<MavenPublication>().configureEach {
 }
 
 val testAndroidPublicationVerifier =
-    tasks.register<Exec>("testAndroidPublicationVerifier") {
+    tasks.register<BuildToolTask>("testAndroidPublicationVerifier") {
         group = "verification"
         description = "Exercises Android publication acceptance and invalid-payload rejection against the actual bundle."
         dependsOn(centralPortalBundle)
-        val testScript = rootProject.layout.projectDirectory.file("verification/test_android_publication.py")
-        val verifier = rootProject.layout.projectDirectory.file("verification/verify_android_publication.py")
-        inputs.files(testScript, verifier, centralPortalBundle.flatMap { it.archiveFile })
-        commandLine(
-            "python3",
-            testScript.asFile,
-            centralPortalBundle
-                .get()
-                .archiveFile
-                .get()
-                .asFile,
-            "--group",
-            project.group.toString(),
-            "--module",
-            libraryName,
-            "--version",
-            project.version.toString(),
-            "--scratch",
-            layout.buildDirectory
-                .dir("publication-verifier-tests")
-                .get()
-                .asFile,
+
+        inputs.files(rootProject.fileTree("buildSrc/src/main/java"), centralPortalBundle.flatMap { it.archiveFile })
+        toolClass.set(AndroidPublicationRegressionVerifier::class.java.name)
+        arguments.addAll(
+            listOf(
+                centralPortalBundle
+                    .get()
+                    .archiveFile
+                    .get()
+                    .asFile,
+                "--group",
+                project.group.toString(),
+                "--module",
+                libraryName,
+                "--version",
+                project.version.toString(),
+                "--scratch",
+                layout.buildDirectory
+                    .dir("publication-verifier-tests")
+                    .get()
+                    .asFile,
+            ).map { it.toString() },
         )
     }
 
 val verifyAndroidPublication =
-    tasks.register<Exec>("verifyAndroidPublication") {
+    tasks.register<BuildToolTask>("verifyAndroidPublication") {
         group = "verification"
         description = "Verifies the Android AAR, POM and metadata in the actual Central bundle."
         dependsOn(centralPortalBundle, testAndroidPublicationVerifier)
-        val verifier = rootProject.layout.projectDirectory.file("verification/verify_android_publication.py")
+
         val bundle = centralPortalBundle.flatMap { it.archiveFile }
         val receipt = layout.buildDirectory.file("reports/publication/android.json")
-        inputs.file(verifier)
+        inputs.files(rootProject.fileTree("buildSrc/src/main/java"))
         inputs.file(bundle)
         outputs.file(receipt)
-        commandLine(
-            "python3",
-            verifier.asFile,
-            bundle.get().asFile,
-            "--group",
-            project.group.toString(),
-            "--module",
-            libraryName,
-            "--version",
-            project.version.toString(),
-            "--receipt",
-            receipt.get().asFile,
+        toolClass.set(AndroidPublicationVerifier::class.java.name)
+        arguments.addAll(
+            listOf(
+                bundle.get().asFile,
+                "--group",
+                project.group.toString(),
+                "--module",
+                libraryName,
+                "--version",
+                project.version.toString(),
+                "--receipt",
+                receipt.get().asFile,
+                "--profile",
+                "async-trait",
+            ).map { it.toString() },
         )
     }
 
@@ -1477,32 +1571,33 @@ tasks.register<Sync>("prepareAndroidPublicationVerification") {
 
 val deploymentBundle = centralPortalBundle.flatMap { it.archiveFile }
 val verifyCentralPortalBundle =
-    tasks.register<Exec>("verifyCentralPortalBundle") {
+    tasks.register<BuildToolTask>("verifyCentralPortalBundle") {
         group = "verification"
         description = "Checks every KMP publication and its payload in the actual Central bundle."
         dependsOn(centralPortalBundle)
-        val verifier = rootProject.file("verification/verify_bundle.py")
+
         val receipt = layout.buildDirectory.file("reports/publication/bundle.json")
-        inputs.file(verifier)
+        inputs.files(rootProject.fileTree("buildSrc/src/main/java"))
         inputs.file(deploymentBundle)
         inputs.property("requireSignatures", signingKey.isPresent)
         outputs.file(receipt)
-        commandLine(
-            "python3",
-            verifier,
-            deploymentBundle.get().asFile,
-            "--group",
-            project.group.toString(),
-            "--module",
-            libraryName,
-            "--version",
-            project.version.toString(),
-            "--namespace",
-            libraryNamespace,
-            "--receipt",
-            receipt.get().asFile,
+        toolClass.set(PublicationBundleVerifier::class.java.name)
+        arguments.addAll(
+            listOf(
+                deploymentBundle.get().asFile,
+                "--group",
+                project.group.toString(),
+                "--module",
+                libraryName,
+                "--version",
+                project.version.toString(),
+                "--namespace",
+                libraryNamespace,
+                "--receipt",
+                receipt.get().asFile,
+            ).map { it.toString() },
         )
-        if (signingKey.isPresent) args("--require-signatures")
+        if (signingKey.isPresent) arguments.add("--require-signatures")
     }
 tasks.register<Sync>("preparePublicationVerification") {
     group = "verification"

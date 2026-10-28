@@ -102,18 +102,20 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: zulu
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.4.0
       - uses: actions/download-artifact@v7
         with:
           name: linux-arm64-tests-${{ github.sha }}
           path: library/build/linux-arm64-test
-      - name: Check Native execution evidence guards
-        run: python3 verification/test_linux_arm64_runner.py
       - name: Execute the exact cross-linked binary on Linux ARM64
         run: >-
-          python3 verification/run_linux_arm64_tests.py
-          library/build/linux-arm64-test/test.kexe
-          --revision '${{ github.sha }}'
-          --reports library/build/reports/linux-arm64-runtime
+          ./gradlew -p buildSrc runBuildTool
+          --args="LinuxArm64TestRunner library/build/linux-arm64-test/test.kexe --revision '${{ github.sha }}' --reports library/build/reports/linux-arm64-runtime"
+          --no-daemon --console=plain
       - uses: actions/upload-artifact@v7
         if: always()
         with:

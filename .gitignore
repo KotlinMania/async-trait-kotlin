@@ -81,3 +81,10 @@ package-lock.json
 # Module SDK and Swift build state
 **/.android-sdk/
 **/.build/
+
+# Java build helpers are source; buildSrc/build remains generated output.
+!buildSrc/
+!buildSrc/src/
+!buildSrc/src/**
+!buildSrc/build.gradle.kts
+!buildSrc/settings.gradle.kts

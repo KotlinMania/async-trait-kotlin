@@ -78,12 +78,22 @@ val testedVersion =
     providers.gradleProperty("libraryVersion").orElse(producerProperties.map { it.getProperty("project.version") })
 
 kotlin {
-    jvmToolchain(libs.versions.jvm.get().toInt())
+    jvmToolchain(
+        libs.versions.jvm
+            .get()
+            .toInt(),
+    )
     compilerOptions { allWarningsAsErrors.set(true) }
     android {
         namespace = "io.github.kotlinmania.asynctrait.androidconsumer"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         withHostTestBuilder { sourceSetTreeName = "test" }
     }
     sourceSets {
@@ -125,7 +135,10 @@ kotlin.targets.named("android") {
             testResults.set(
                 providers.provider {
                     check(consumerTests.size == 1) { "Expected one Android host test runner" }
-                    consumerTests.single().reports.junitXml.outputLocation.get()
+                    consumerTests
+                        .single()
+                        .reports.junitXml.outputLocation
+                        .get()
                 },
             )
             dependsOn(consumerCompile, consumerTests)

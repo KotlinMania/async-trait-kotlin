@@ -2,6 +2,7 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ModuleComponentSelector
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension
@@ -11,7 +12,6 @@ import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootExtension
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -41,20 +41,31 @@ abstract class VerifyPublishedVariant : DefaultTask() {
     }
 }
 
-val libraryVersion = providers.gradleProperty("libraryVersion").orElse(
-    providers.fileContents(layout.projectDirectory.file("../../gradle.properties")).asText.map { text ->
-        text.lineSequence().first { it.startsWith("project.version=") }.substringAfter('=')
-    },
-)
+val libraryVersion =
+    providers.gradleProperty("libraryVersion").orElse(
+        providers.fileContents(layout.projectDirectory.file("../../gradle.properties")).asText.map { text ->
+            text.lineSequence().first { it.startsWith("project.version=") }.substringAfter('=')
+        },
+    )
 
 kotlin {
-    jvmToolchain(libs.versions.jvm.get().toInt())
+    jvmToolchain(
+        libs.versions.jvm
+            .get()
+            .toInt(),
+    )
     compilerOptions { allWarningsAsErrors = true }
     jvm()
     android {
         namespace = "io.github.kotlinmania.asynctrait.consumer"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
         withHostTestBuilder { sourceSetTreeName = "test" }
     }
     js { nodejs() }
@@ -86,38 +97,39 @@ extensions.configure<NodeJsEnvSpec> { version = libs.versions.node.get() }
 extensions.configure<WasmNodeJsEnvSpec> { version = libs.versions.node.get() }
 extensions.configure<YarnRootEnvSpec> { version = libs.versions.yarn.get() }
 extensions.configure<WasmYarnRootEnvSpec> { version = libs.versions.yarn.get() }
-val npmResolutions = mapOf(
-    "diff" to libs.versions.npmDiff.get(),
-    "fast-uri" to libs.versions.npmFastUri.get(),
-    "serialize-javascript" to libs.versions.npmSerializeJavascript.get(),
-    "webpack" to libs.versions.webpack.get(),
-    "follow-redirects" to libs.versions.npmFollowRedirects.get(),
-    "lodash" to libs.versions.npmLodash.get(),
-    "ajv" to libs.versions.npmAjv.get(),
-    "brace-expansion" to libs.versions.npmBraceExpansion.get(),
-    "flatted" to libs.versions.npmFlatted.get(),
-    "minimatch" to libs.versions.npmMinimatch.get(),
-    "picomatch" to libs.versions.npmPicomatch.get(),
-    "qs" to libs.versions.npmQs.get(),
-    "socket.io-parser" to libs.versions.npmSocketIoParser.get(),
-    "ws" to libs.versions.npmWs.get(),
-    "@types/estree" to libs.versions.npmTypesEstree.get(),
-    "@types/node" to libs.versions.npmTypesNode.get(),
-    "baseline-browser-mapping" to libs.versions.npmBaselineBrowserMapping.get(),
-    "caniuse-lite" to libs.versions.npmCaniuseLite.get(),
-    "electron-to-chromium" to libs.versions.npmElectronToChromium.get(),
-    "enhanced-resolve" to libs.versions.npmEnhancedResolve.get(),
-    "mime-db" to libs.versions.npmMimeDb.get(),
-    "node-releases" to libs.versions.npmNodeReleases.get(),
-    "terser" to libs.versions.npmTerser.get(),
-    "terser-webpack-plugin" to libs.versions.npmTerserWebpackPlugin.get(),
-    "webpack-sources" to libs.versions.npmWebpackSources.get(),
-    "ua-parser-js" to libs.versions.npmUaParserJs.get(),
-    "tmp" to libs.versions.npmTmp.get(),
-    "body-parser" to libs.versions.npmBodyParser.get(),
-    "js-yaml" to libs.versions.npmJsYaml.get(),
-    "browserslist" to libs.versions.npmBrowserslist.get(),
-)
+val npmResolutions =
+    mapOf(
+        "diff" to libs.versions.npmDiff.get(),
+        "fast-uri" to libs.versions.npmFastUri.get(),
+        "serialize-javascript" to libs.versions.npmSerializeJavascript.get(),
+        "webpack" to libs.versions.webpack.get(),
+        "follow-redirects" to libs.versions.npmFollowRedirects.get(),
+        "lodash" to libs.versions.npmLodash.get(),
+        "ajv" to libs.versions.npmAjv.get(),
+        "brace-expansion" to libs.versions.npmBraceExpansion.get(),
+        "flatted" to libs.versions.npmFlatted.get(),
+        "minimatch" to libs.versions.npmMinimatch.get(),
+        "picomatch" to libs.versions.npmPicomatch.get(),
+        "qs" to libs.versions.npmQs.get(),
+        "socket.io-parser" to libs.versions.npmSocketIoParser.get(),
+        "ws" to libs.versions.npmWs.get(),
+        "@types/estree" to libs.versions.npmTypesEstree.get(),
+        "@types/node" to libs.versions.npmTypesNode.get(),
+        "baseline-browser-mapping" to libs.versions.npmBaselineBrowserMapping.get(),
+        "caniuse-lite" to libs.versions.npmCaniuseLite.get(),
+        "electron-to-chromium" to libs.versions.npmElectronToChromium.get(),
+        "enhanced-resolve" to libs.versions.npmEnhancedResolve.get(),
+        "mime-db" to libs.versions.npmMimeDb.get(),
+        "node-releases" to libs.versions.npmNodeReleases.get(),
+        "terser" to libs.versions.npmTerser.get(),
+        "terser-webpack-plugin" to libs.versions.npmTerserWebpackPlugin.get(),
+        "webpack-sources" to libs.versions.npmWebpackSources.get(),
+        "ua-parser-js" to libs.versions.npmUaParserJs.get(),
+        "tmp" to libs.versions.npmTmp.get(),
+        "body-parser" to libs.versions.npmBodyParser.get(),
+        "js-yaml" to libs.versions.npmJsYaml.get(),
+        "browserslist" to libs.versions.npmBrowserslist.get(),
+    )
 listOf(
     rootProject.extensions.getByType<YarnRootExtension>(),
     rootProject.extensions.getByType<WasmYarnRootExtension>(),
@@ -152,24 +164,37 @@ kotlin.targets.configureEach {
         if (platformType == KotlinPlatformType.androidJvm) expectedAttributes["org.gradle.libraryelements"] = "aar"
         if (platformType == KotlinPlatformType.jvm) expectedAttributes["org.gradle.libraryelements"] = "jar"
         compilations.named("main") {
-            val selected = configurations.getByName(compileDependencyConfigurationName).incoming.resolutionResult.rootComponent.map { root ->
-                val dependency = root.dependencies.filterIsInstance<ResolvedDependencyResult>().single {
-                    val requested = it.requested
-                    requested is ModuleComponentSelector && requested.group == "io.github.kotlinmania" &&
-                        requested.module == "async-trait-kotlin"
+            val selected =
+                configurations.getByName(compileDependencyConfigurationName).incoming.resolutionResult.rootComponent.map { root ->
+                    val dependency =
+                        root.dependencies.filterIsInstance<ResolvedDependencyResult>().single {
+                            val requested = it.requested
+                            requested is ModuleComponentSelector && requested.group == "io.github.kotlinmania" &&
+                                requested.module == "async-trait-kotlin"
+                        }
+                    val variant = dependency.resolvedVariant.externalVariant.orElse(dependency.resolvedVariant)
+                    val owner = variant.owner as ModuleComponentIdentifier
+                    variant.attributes.keySet().associate { it.name to variant.attributes.getAttribute(it).toString() } +
+                        mapOf(
+                            "module" to owner.module,
+                            "version" to owner.version,
+                            "group" to owner.group,
+                            "variant" to variant.displayName,
+                        )
                 }
-                val variant = dependency.resolvedVariant.externalVariant.orElse(dependency.resolvedVariant)
-                val owner = variant.owner as ModuleComponentIdentifier
-                variant.attributes.keySet().associate { it.name to variant.attributes.getAttribute(it).toString() } +
-                    mapOf("module" to owner.module, "version" to owner.version, "group" to owner.group,
-                        "variant" to variant.displayName)
-            }
-            val verifyVariant = tasks.register<VerifyPublishedVariant>("verify${targetName.replaceFirstChar { it.uppercase() }}Variant") {
-                selection.set(selected)
-                expected.set(expectedAttributes + mapOf("module" to "async-trait-kotlin-${targetName.lowercase()}",
-                    "group" to "io.github.kotlinmania", "version" to libraryVersion.get()))
-                receipt.set(layout.buildDirectory.file("reports/publication/$targetName.properties"))
-            }
+            val verifyVariant =
+                tasks.register<VerifyPublishedVariant>("verify${targetName.replaceFirstChar { it.uppercase() }}Variant") {
+                    selection.set(selected)
+                    expected.set(
+                        expectedAttributes +
+                            mapOf(
+                                "module" to "async-trait-kotlin-${targetName.lowercase()}",
+                                "group" to "io.github.kotlinmania",
+                                "version" to libraryVersion.get(),
+                            ),
+                    )
+                    receipt.set(layout.buildDirectory.file("reports/publication/$targetName.properties"))
+                }
             verifyPublication.configure { dependsOn(verifyVariant) }
         }
     }
