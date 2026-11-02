@@ -11,6 +11,7 @@ import io.github.kotlinmania.quote.quote
 import io.github.kotlinmania.syn.Attribute
 import io.github.kotlinmania.syn.Block
 import io.github.kotlinmania.syn.BracePeek
+import io.github.kotlinmania.syn.ConstPeek
 import io.github.kotlinmania.syn.DefaultParse
 import io.github.kotlinmania.syn.DefaultPeek
 import io.github.kotlinmania.syn.Expr
@@ -25,6 +26,7 @@ import io.github.kotlinmania.syn.Stmt
 import io.github.kotlinmania.syn.StmtParse
 import io.github.kotlinmania.syn.SynError
 import io.github.kotlinmania.syn.SynResult
+import io.github.kotlinmania.syn.SynTypePeek
 import io.github.kotlinmania.syn.TraitItem
 import io.github.kotlinmania.syn.VisibilityParse
 import io.github.kotlinmania.syn.braced
@@ -244,6 +246,9 @@ private fun parseImplBody(input: ParseStream): SynResult<List<ImplItem>> {
 }
 
 private fun consumeUntilItemEnd(input: ParseStream): SynResult<TokenStream> {
+    // Upstream syn TraitItem/ImplItem `const` and `type` grammars always end at a top-level `;`,
+    // even when their initializer, bounds, or generic arguments contain `{ ... }` groups.
+    val requireSemi = requiresTerminatingSemicolon(input)
     val trees = mutableListOf<TokenTree>()
     while (!input.isEmpty()) {
         val tree =
@@ -256,11 +261,20 @@ private fun consumeUntilItemEnd(input: ParseStream): SynResult<TokenStream> {
         if (tree is TokenTree.Punct && tree.value.asChar() == ';') {
             return SynResult.success(TokenStream.fromTokenTrees(trees))
         }
-        if (tree is TokenTree.Group && tree.value.delimiter() == Delimiter.Brace) {
+        if (!requireSemi && tree is TokenTree.Group && tree.value.delimiter() == Delimiter.Brace) {
             return SynResult.success(TokenStream.fromTokenTrees(trees))
         }
     }
     return SynResult.failure(input.error("unexpected end of input"))
+}
+
+private fun requiresTerminatingSemicolon(input: ParseStream): Boolean {
+    val fork = input.fork()
+    val visOk = VisibilityParse.parse(fork).isSuccess
+    if (visOk && fork.peek(DefaultPeek) && !fork.peek2(NotPeek)) {
+        DefaultParse.parse(fork)
+    }
+    return visOk && (fork.peek(ConstPeek) || fork.peek(SynTypePeek))
 }
 
 private fun parseBlockStmts(input: ParseStream): SynResult<List<Stmt>> {

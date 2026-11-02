@@ -26,11 +26,12 @@ internal class CollectLifetimes(
         if (lifetimeRef == null) {
             nextLifetime(reference.span)
         } else {
-            visitLifetime(lifetimeRef)
+            collectLifetime(lifetimeRef)
             lifetimeRef
         }
 
-    override fun visitLifetime(lt: Lifetime) {
+    // Inherent helper invoked only for reference and generic lifetime arguments, not base visitor traversal.
+    private fun collectLifetime(lt: Lifetime) {
         if (lt.ident.toString() == "_") {
             val next = nextLifetime(lt.span())
             lt.ident = next.ident
@@ -73,7 +74,7 @@ internal class CollectLifetimes(
 
     override fun visitGenericArgument(genArg: GenericArgument) {
         if (genArg is GenericArgument.LifetimeArg) {
-            visitLifetime(genArg.lifetime)
+            collectLifetime(genArg.lifetime)
         }
         super.visitGenericArgument(genArg)
     }
