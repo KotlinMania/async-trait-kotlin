@@ -12,7 +12,7 @@ class VerbatimTest {
     fun invalidRestrictedVisibilityRetainsItsDiagnostic() {
         val parsed = parse2(VerbatimFn::parse, quote("pub(in crate::) fn method();"))
         val error = assertNotNull(parsed.exceptionOrNull())
-        assertTrue(error.message.orEmpty().contains("expected path segment after `::`"))
+        assertTrue(error.message.contains("expected path segment after `::`"))
     }
 
     @Test
