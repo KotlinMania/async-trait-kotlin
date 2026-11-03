@@ -69,7 +69,7 @@ class ItemBoundaryParityTest {
             )
         assertTrue(traitExpansion.isSuccess, "Trait expansion failed: ${traitExpansion.error}")
         val traitSource = assertNotNull(traitExpansion.source)
-        containsTokens(traitSource, "const SUM: usize = ({ 2 }) + if true { 3 } else { 0 } * ({ 4 });")
+        containsTokens(traitSource, "const SUM: usize = { 2 } + if true { 3 } else { 0 } * { 4 };")
         containsTokens(traitSource, "fn compute<'life0, 'async_trait>(&'life0 self, extra: usize)")
 
         val implExpansion =
@@ -87,7 +87,7 @@ class ItemBoundaryParityTest {
             )
         assertTrue(implExpansion.isSuccess, "Impl expansion failed: ${implExpansion.error}")
         val implSource = assertNotNull(implExpansion.source)
-        containsTokens(implSource, "const SUM: usize = ({ 2 }) + if true { 3 } else { 0 } * ({ 4 });")
+        containsTokens(implSource, "const SUM: usize = { 2 } + if true { 3 } else { 0 } * { 4 };")
         containsTokens(implSource, "const OFFSET: i32 = Point { x: 4, y: 5 }.x + 1;")
         containsTokens(implSource, "let extra = extra;")
         assertTrue("Box :: pin (async move {" in implSource, implSource)
