@@ -6,22 +6,21 @@ Rust's [async-trait](https://github.com/dtolnay/async-trait), based on version
 async method signatures and bodies, and emits tokens with `quote-kotlin` and
 `proc-macro2-kotlin`.
 
-The implementation and regression tests live in `library/src/commonMain` and
-`library/src/commonTest`. This transformation does not require platform I/O, so
+The implementation and regression tests live in `src/common/commonMain` and
+`src/common/commonTest`. This transformation does not require platform I/O, so
 all targets share the same implementation. Kotlin's default hierarchy connects
 the native, Apple, Linux, Android Native and web source sets.
 
 ## Gradle structure
 
-- `settings.gradle.kts` declares repositories and includes `:library`.
-- The root `build.gradle.kts` declares plugin aliases and forwards build, check and test to `:library`.
-- `gradle/libs.versions.toml` controls plugin, SDK, library and tool versions.
-- `gradle.properties` holds Gradle options and publication identity.
-- `library/build.gradle.kts` applies the plugins and declares every target in
-  one `kotlin {}` block, including Android, source sets and Swift Export.
-- `verification/consumer` is an independent build that resolves publications
-  extracted from the verified Central bundle. It does not use project dependencies
-  or source substitution.
+- `settings.gradle.kts` declares repositories and resolves `project.name` from `gradle.properties`.
+- `build.gradle.kts` applies the plugins and declares every target in one `kotlin {}`
+  block, including Android, source sets, Swift Export, and verification gates.
+- `gradle/libs.versions.toml` controls plugin, library and dependency bundles.
+- `gradle.properties` holds Gradle options, toolchain pins and publication identity.
+- `verifier.properties` configures standalone publication and runtime verifiers.
+- `verification/android-consumer` is an independent build that resolves publications
+  extracted from the verified Central bundle without project dependencies or source substitution.
 
 The declared targets are JVM, Android, JavaScript, Wasm/JS, Wasm/WASI, Linux x64
 and ARM64, Windows x64, Android Native x64 and ARM64, macOS ARM64, iOS ARM64 and
@@ -87,7 +86,8 @@ Studio's `local.properties` or the standard `ANDROID_HOME` environment variable
 selects the SDK.
 
 ```shell
-./gradlew :library:test :library:build --continue
+./gradlew test
+./gradlew build
 ```
 
 `build` compiles every declared main and test compilation, links every native
@@ -100,7 +100,7 @@ Building a test executable is not counted as executing its tests.
 JavaScript and Wasm/JS browser tests use Chrome Headless. Node runs JavaScript,
 Wasm/JS and Wasm/WASI tests. Apple simulator tests require an installed runtime
 and device for each of iOS, tvOS and watchOS. Windows tests must run on Windows. Linux ARM64 tests are cross-linked on
-Linux x64 with `:library:prepareLinuxArm64Test`, then the exact hashed AArch64
+Linux x64 with `prepareLinuxArm64Test`, then the exact hashed AArch64
 executable runs on the Linux ARM64 CI host. Kotlin/Native does not provide a
 Linux ARM64 compiler host. The runtime guard verifies the real host, ELF
 architecture, artifact hash and complete nonempty test results; raw output,
@@ -120,11 +120,11 @@ a macOS command-line validation, provide:
 
 ```shell
 SDK_NAME=macosx CONFIGURATION=Debug ARCHS=arm64 \
-BUILT_PRODUCTS_DIR="$PWD/library/build/swift-test" \
-TARGET_BUILD_DIR="$PWD/library/build/swift-test" \
+BUILT_PRODUCTS_DIR="$PWD/build/swift-test/Debug" \
+TARGET_BUILD_DIR="$PWD/build/swift-test/Debug" \
 FRAMEWORKS_FOLDER_PATH=Frameworks MACOSX_DEPLOYMENT_TARGET=15.0 \
 DEPLOYMENT_TARGET_SETTING_NAME=MACOSX_DEPLOYMENT_TARGET \
-./gradlew :library:test :library:build --continue
+./gradlew test build
 ```
 
 The Swift tests import the generated `AsyncTrait` module and exercise real
@@ -145,9 +145,9 @@ The separate Android consumer forces three named Kotlin behavior tests to execut
 and rejects missing, skipped or failing XML cases.
 
 ```shell
-./gradlew :library:prepareAndroidPublicationVerification --no-configuration-cache
+./gradlew prepareAndroidPublicationVerification
 env -u ANDROID_SDK_ROOT ./gradlew -p verification/android-consumer \
-  verifyAndroidPublication --refresh-dependencies --no-configuration-cache
+  verifyAndroidConsumer --refresh-dependencies
 ```
 
 The Android reusable workflow and `publish=false` dry run retain these checks.
@@ -163,12 +163,11 @@ JAR contains Kotlin metadata; it does not contain JVM bytecode. Apple KLIB
 publications and the separately built XCFrameworks are distinct artifacts.
 
 ```shell
-./gradlew :library:preparePublicationVerification
-./gradlew -p verification/consumer -PlibraryVersion=0.1.3 verifyPublication allTests --refresh-dependencies --continue
+./gradlew preparePublicationVerification
 ```
 
-`centralPortalBundle` stages Maven files under `library/build/staging-deploy`
-and creates a ZIP under `library/build/central-portal`. It includes only the
+`centralPortalBundle` stages Maven files under `build/staging-deploy`
+and creates a ZIP under `build/central-portal`. It includes only the
 current publication coordinates and version. It does not upload.
 `verifyCentralPortalBundle` inspects the ZIP's AAR, compiled Kotlin/JVM JAR,
 KLIB payloads, metadata links, hashes and publication variants.

@@ -3,6 +3,9 @@
 > **Distributed source of truth:** `template/SWIFT.md` is the canonical copy
 > distributed to projects. Keep the KotlinMania-root `SWIFT.md` byte-for-byte
 > synchronized with it. Update these copies through one coordinated writer.
+> For a standalone, task-oriented technical reference with linked table of
+> contents, stable section anchors, command recipes, and exact evidence tables,
+> see the companion guide [`template/V2_SWIFT.md`](file:///Volumes/stuff/Projects/kotlinmania/template/V2_SWIFT.md).
 
 > **Self-contained instruction set.** This file lives at the root of every
 > repository that has the canonical KotlinMania Swift Export rollout
@@ -12,7 +15,15 @@
 > opening the pull request. Nothing in this recipe depends on context from
 > outside the current repository.
 
-## TL;DR
+> **IMPORTANT — Historical Rollout Log vs. Current Normative Rules (`2026-10-21`):**
+> Sections from the initial May 2026 rollout below are preserved for historical provenance, but **several early patterns are now retired workspace-wide and must NEVER be applied**:
+> 1. **Retired Apple `x86_64` & 32-bit targets:** `iosX64`, `macosX64`, `tvosX64`, `watchosX64`, `watchosArm32`, `watchosArm64` (`arm64_32`), `androidNativeArm32`, `androidNativeX86`, `linuxArm32Hfp`, and `mingwX86` are retired workspace-wide (`AGENTS.md` §5.5). Only `iosSimulatorArm64` (`isStatic = true`) is used for iOS Simulator; never add `iosX64` or fat simulator framework tasks.
+> 2. **Import-only `XCTAssertTrue(true)` smoke tests are rejected:** Every Swift test harness must instantiate exported types, call real methods, and assert concrete behavioral outcomes with positive executed test counts.
+> 3. **No automatic PR-triggered CI:** The top-level workflow (`ci.yml`) uses manual `workflow_dispatch`, reusable platform workflows (`swift.yml`, `macos.yml`, `ios.yml`, `linux.yml`, etc.) use `workflow_call`, and `publish.yml` uses `release` (`published` / `released`) plus `workflow_dispatch` (`AGENTS.md` §7) — none use `push` or `pull_request` triggers.
+> 4. **Never hide public generic APIs or claim "no API change" when erasing return types to `Iterator<Pair<A, B>>`:** De-generify into concrete named types/records (`V2_SWIFT.md` §6), and never leak `kotlin.Pair` on public surfaces.
+> 5. **API-preserving `KotlinError.wrapped` (`32f6c1ac` diagnostic & `e1b871c` published `io.github.kotlinmania:swift-export-embeddable:2.4.20-km.1` + `KotlinBase.h` `99186d1d`) is the validated mixed-mode reference:** Accepting removal of `KotlinError.wrapped` (the historical `11da4d91` snapshot candidate) is **not** mandatory. All three upstream producer releases (`io.github.kotlinmania:swift-export-embeddable:2.4.20-km.1`, `io.github.kotlinmania:proc-macro2-kotlin:0.1.7`, and `io.github.kotlinmania:syn-kotlin:0.4.0`) are now **PUBLISHED and independently verified on public Maven Central**; downstream repositories may adopt them **only along legitimate project dependency and tool edges** and must still pass their own unchanged behavioral acceptance. Always read [`template/V2_SWIFT.md`](file:///Volumes/stuff/Projects/kotlinmania/template/V2_SWIFT.md) first for current normative recipes.
+
+## TL;DR (Historical Initial Rollout — See Note Above)
 
 A workspace-wide rollout already produced a local branch named
 `automation/swift-export-rollout` with a single canonical commit (the
@@ -23,7 +34,7 @@ loop into the repository. **Your job, Claude, is to:**
 2. **Open a pull request** against the base branch the rollout was made
    from (NOT necessarily `main`), using the title and body template in
    [§ PR template](#pr-template) below.
-3. **Verify** the PR landed cleanly and CI was kicked off.
+3. **Verify** the PR landed cleanly *(Historical note: CI workflows now use manual `workflow_dispatch` per `AGENTS.md` §7 and do not auto-trigger on PR creation)*.
 4. **Comment on the assigned issue** linking the new PR and close the
    issue with a one-line summary.
 
@@ -44,32 +55,18 @@ in the workspace, mirroring the canonical pattern that landed in
 proven end-to-end with a working `swift test` invocation against the
 `embedSwiftExportForXcode`-produced Swift Package Manager package.
 
-### The five changes
+### The five changes (Historical Initial Rollout)
 
-1. **`build.gradle.kts`** — **both** iOS Simulator framework binaries
-   (`iosSimulatorArm64` *and* `iosX64`) now have `isStatic = true`.
-   The Swift Export SPM bridge expects a static framework for the iOS
-   Simulator so that the SPM linker can pull in the symbol
-   implementations directly. Both simulator slices must match — if
-   `iosSimulatorArm64` is static and `iosX64` is left dynamic, the
-   `assembleDebugIosSimulatorFatFrameworkFor<Name>XCFramework` task
-   fails with:
+1. **`build.gradle.kts`** — **[HISTORICAL / `iosX64` RETIRED]** In the initial May 2026 rollout, both iOS Simulator framework binaries (`iosSimulatorArm64` and the now-retired `iosX64`) were set to `isStatic = true`. **Current rule (`AGENTS.md` §5.5):** `iosX64` (along with all Apple `x86_64` and 32-bit targets) is **retired workspace-wide** and must never be configured. Only `iosSimulatorArm64` (`isStatic = true`) remains for iOS Simulator.
 
-   ```
-   Cannot create a fat framework from:
-     <Name> - arm64 - static
-     <Name> - x64 - dynamic
-     All input frameworks must be either static or dynamic
-   ```
-
-   The other Apple targets (`iosArm64`, `tvosArm64`,
-   `tvosSimulatorArm64`, `watchos*`, `macosArm64`) stay dynamic.
-
-   > **Note**: earlier versions of this recipe and of `apply.sh` flipped
-   > only `iosSimulatorArm64`. Repos that landed the rollout before this
-   > correction need a follow-up commit adding `isStatic = true` to
-   > `iosX64`. http-kotlin's `build.gradle.kts:218-231` is the working
-   > reference shape.
+   > **Historical context only (retired `iosX64`):** When `iosX64` still existed, mixing static `iosSimulatorArm64` and dynamic `iosX64` failed `assembleDebugIosSimulatorFatFrameworkFor<Name>XCFramework` with:
+   > ```
+   > Cannot create a fat framework from:
+   >   <Name> - arm64 - static
+   >   <Name> - x64 - dynamic
+   >   All input frameworks must be either static or dynamic
+   > ```
+   > Because `iosX64` is now removed across the workspace, only `iosSimulatorArm64` is configured (`isStatic = true`), while `iosArm64`, `tvosArm64`, `tvosSimulatorArm64`, `watchosDeviceArm64`, `watchosSimulatorArm64`, and `macosArm64` stay dynamic.
 
 2. **`.github/workflows/swift.yml`** — a new platform workflow with a
    `workflow_call:` trigger, matching the shape of the existing
@@ -92,7 +89,7 @@ proven end-to-end with a working `swift test` invocation against the
        generated from the upstream Kotlin source, plus four
        `.swiftmodule/` bundles named `<Module>`, `KotlinRuntimeSupport`,
        `ExportedKotlinPackages`, and `KotlinRuntime`.
-     - Changes directory into `swift-test-harness/` and runs
+     - Changes directory into `src/swift/swift-test-harness` and runs
        `swift test`, which compiles and runs the smoke test against
        the just-produced Swift module.
      - Uploads the static archive, swiftmodule bundles, and the full
@@ -105,13 +102,13 @@ proven end-to-end with a working `swift test` invocation against the
    the same `permissions: contents: read` ceiling. This makes the
    `swift.yml` workflow run as part of the regular CI orchestration.
 
-4. **`swift-test-harness/`** — a new top-level directory containing:
+4. **`src/swift/swift-test-harness/`** — the Swift package directory containing:
      - `Package.swift` — a Swift Package Manager package depending on
        the Kotlin-generated SPM at
-       `../build/SPMPackage/macosArm64/Debug` with one `testTarget`
+       `../../../build/SPMPackage/macosArm64/Debug` with one `testTarget`
        (`SwiftTestHarnessTests`). The testTarget carries a
        `linkerSettings` block with
-       `unsafeFlags(["-L", "../build/swift-test", "-l<Module>"])` so
+       `unsafeFlags(["-L", "../../../build/swift-test", "-l<Module>"])` so
        that `swift test` (run outside an `xcodebuild`-driven
        invocation) can resolve the `__root____*` and KotlinError
        symbols from the static archive that `embedSwiftExportForXcode`
@@ -120,14 +117,7 @@ proven end-to-end with a working `swift test` invocation against the
        reference its own `lib<Module>.a` as a binary target (one of
        the two upstream gaps noted in [§ Known upstream gaps](#known-upstream-gaps)
        below).
-     - `Tests/SwiftTestHarnessTests/<Module>ExportTests.swift` — a
-       smoke test that does `import <Module>` and asserts a single
-       `XCTAssertTrue(true, ...)`. Because the import is at the
-       module level, the file's mere ability to compile proves that
-       `<Module>.swiftmodule` exists and is correctly placed; the
-       fact that the test executable links proves the static archive
-       is reachable; the fact that the test runs proves the full
-       loop is green for this repo.
+     - `Tests/SwiftTestHarnessTests/<Module>ExportTests.swift` — **[HISTORICAL SCAFFOLD — SUPERSEDED]** The initial rollout generated a placeholder smoke test that did `import <Module>` and asserted a single `XCTAssertTrue(true, ...)`. **Current normative rule:** An import-only `XCTAssertTrue(true)` test is **never accepted** as proof that Swift Export works (see [§ Annotation hiding is not an API repair](#annotation-hiding-is-not-an-api-repair) and [`template/V2_SWIFT.md` §1](file:///Volumes/stuff/Projects/kotlinmania/template/V2_SWIFT.md#overview-and-core-invariants)). Every repository's Swift test suite must instantiate primary exported types, call representative methods, and assert concrete behavioral results with positive executed test counts.
      - `.gitignore` — ignores the SPM `.build/` output directory.
 
 5. **`.gitignore`** — appended with a Swift/Xcode workspace state
@@ -224,9 +214,9 @@ Must list at minimum:
 - `build.gradle.kts` modified (1 insertion if multi-line iosSimulatorArm64 form, 4 insertions and 1 deletion if single-line form)
 - `.github/workflows/swift.yml` new
 - `.github/workflows/ci.yml` modified (4-line addition)
-- `swift-test-harness/Package.swift` new
-- `swift-test-harness/.gitignore` new
-- `swift-test-harness/Tests/SwiftTestHarnessTests/<Module>ExportTests.swift` new
+- `src/swift/swift-test-harness/Package.swift` new
+- `src/swift/swift-test-harness/.gitignore` new
+- `src/swift/swift-test-harness/Tests/SwiftTestHarnessTests/<Module>ExportTests.swift` new
 - `.gitignore` modified
 
 It may also include this `SWIFT_EXPORT_ROLLOUT.md` file at the repo
@@ -298,20 +288,15 @@ BODY
 
 Capture the returned PR URL — you'll need it for the issue comment.
 
-### Step 3 — verify CI kicked off
+### Step 3 — verify PR state (Historical Note: CI is now manual `workflow_dispatch`)
+
+> **Historical note (`AGENTS.md` §7):** At the time of the initial rollout, some repositories still had PR-triggered checks. Across KotlinMania, the top-level workflow (`ci.yml`) now uses manual `workflow_dispatch`, reusable platform workflows (`swift.yml`, `macos.yml`, `ios.yml`, `linux.yml`, etc.) use `workflow_call`, and `publish.yml` uses `release` (`published` / `released`) plus `workflow_dispatch` — none run automatically on `push` or `pull_request`. Never add `push` or `pull_request` triggers; trigger CI deliberately via `gh workflow run ci.yml --ref <branch>` only after all local build and test gates pass.
 
 ```sh
 gh pr view <pr-number> --json statusCheckRollup
 ```
 
-If the field is empty or shows "queued" / "in_progress", that's
-expected — the workflow_call orchestration may take a minute to fan
-out. Don't wait for completion; just verify a run was registered.
-
-If the PR was created against a base branch that does NOT have CI
-configured to run on PRs (e.g., a `chore/*` feature branch with no
-PR triggers), there will be no check rollup. That's still fine —
-note it in the summary.
+If the field is empty, that is expected under the workspace-wide `workflow_dispatch`-only CI policy.
 
 ### Step 4 — close the assigned issue
 
@@ -353,8 +338,9 @@ end-to-end with a passing `swift test` invocation against the
 The full recipe for the rollout — including the rationale for each
 change, the two upstream Kotlin Multiplatform plugin gaps it works
 around, and the precondition / verification checks the Claude agent
-ran before opening this PR — is checked in at the repo root as
-[`SWIFT_EXPORT_ROLLOUT.md`](./SWIFT_EXPORT_ROLLOUT.md).
+ran before opening this PR — is checked in at the repo root in
+[`SWIFT.md` (§ The five changes)](#the-five-changes-historical-initial-rollout)
+*(historically named `SWIFT_EXPORT_ROLLOUT.md` before workspace consolidation)*.
 
 ## What this PR changes
 
@@ -364,11 +350,11 @@ ran before opening this PR — is checked in at the repo root as
 - `.github/workflows/swift.yml` (new) — `workflow_call:` platform
   workflow that sets the full Xcode-style environment, runs
   `./gradlew embedSwiftExportForXcode`, then runs `swift test` from
-  `swift-test-harness/`. Uploads the static archive and `.swiftmodule`
+  `src/swift/swift-test-harness/`. Uploads the static archive and `.swiftmodule`
   bundles as artifacts on success-or-failure.
 - `.github/workflows/ci.yml` — adds the `swift:` job alongside
   `wasm:` and `js:`.
-- `swift-test-harness/` (new) — a Swift Package Manager package with
+- `src/swift/swift-test-harness/` (new) — a Swift Package Manager package with
   one smoke test that asserts the Swift module imports cleanly.
 - `.gitignore` — Swift/SPM workspace state section.
 
@@ -390,8 +376,8 @@ at once:
 1. **`Package.swift` doesn't reference its own static archive.** The
    Kotlin plugin emits Swift source files for the SPM package but
    does not declare `lib<Module>.a` as a binary target or expose its
-   link path. `swift-test-harness/Package.swift` compensates with
-   `unsafeFlags(["-L", "../build/swift-test", "-l<Module>"])`.
+   link path. `src/swift/swift-test-harness/Package.swift` compensates with
+   `unsafeFlags(["-L", "../../../build/swift-test", "-l<Module>"])`.
 2. **`BuildSPMSwiftExportPackage` validates
    `deploymentTargetSettingName` as a non-optional input** but
    provides no default. Outside Xcode the env var
@@ -399,7 +385,8 @@ at once:
    property validation. `swift.yml` sets it explicitly.
 
 🤖 Opened by the Claude GitHub Agent following
-[`SWIFT_EXPORT_ROLLOUT.md`](./SWIFT_EXPORT_ROLLOUT.md).
+[`SWIFT.md` (§ The five changes)](#the-five-changes-historical-initial-rollout)
+*(historically `SWIFT_EXPORT_ROLLOUT.md`)*.
 ```
 
 ---
@@ -440,8 +427,8 @@ Then stop. A human will pick it up.
 ## Known upstream gaps
 
 1. **Kotlin-plugin-generated `Package.swift` doesn't reference its
-   static archive.** Workaround in `swift-test-harness/Package.swift`:
-   `unsafeFlags(["-L", "../build/swift-test", "-l<Module>"])`.
+   static archive.** Workaround in `src/swift/swift-test-harness`:
+   `unsafeFlags(["-L", "../../../build/swift-test", "-l<Module>"])`.
 
 2. **`BuildSPMSwiftExportPackage.deploymentTargetSettingName` has no
    default.** Workaround in `.github/workflows/swift.yml`:
@@ -486,8 +473,9 @@ Then stop. A human will pick it up.
    but Apple consumers do not. Repair the public API by renaming colliding
    declarations and replacing Swift-hostile shapes with strongly-typed,
    bridgeable Kotlin declarations. See
-   [`triage-kotlin-stdlib-in-public-api.md`](./triage-kotlin-stdlib-in-public-api.md)
-   for the workspace-wide hit list.
+   [§ The four hazard classes (what makes Swift Export fail under `-Werror`)](#the-four-hazard-classes-what-makes-swift-export-fail-under--werror)
+   *(into which the historical `triage-kotlin-stdlib-in-public-api.md` notes were merged)*
+   for the workspace-wide taxonomy.
 
 4. **Swift Export does NOT preserve Kotlin sealed-subclass casts.**
    Discovered empirically while making http-kotlin's `swift test`
@@ -501,7 +489,7 @@ Then stop. A human will pick it up.
 
 5. **Swift accesses Kotlin companion objects as `Type.Companion.shared.member`**,
    not `Type.companion.member`. Common gotcha when writing the smoke
-   test in `swift-test-harness/`. The Swift binding generated by the
+   test in `src/swift/swift-test-harness`. The Swift binding generated by the
    plugin uses a capital `Companion` struct type with a `shared`
    singleton accessor, not a lowercase `companion` property.
 
@@ -584,21 +572,24 @@ become deletable.
    does NOT apply — these are iterator/wrapper types that cannot be
    flattened without unfaithful translation.
 
-   *Per-repo fix:* stop exposing the unconstrained generic classes.
-   Swift Export only emits bridge code for symbols visible in the
-   public API surface — internal types are skipped, so no
-   `as <UserClass><Any?>` cast gets generated for them. The pattern
-   from itertools-kotlin commit `40513a5`:
+   *Per-repo fix (HISTORICAL — see warning below):* stop exposing the
+   unconstrained generic classes. Swift Export only emits bridge code for
+   symbols visible in the public API surface — internal types are skipped,
+   so no `as <UserClass><Any?>` cast gets generated for them. The historical
+   pattern from itertools-kotlin commit `40513a5`:
 
-   - Mark every public unconstrained generic iterator/wrapper class
+   > [!WARNING]
+   > **Historical instruction — do NOT hide public upstream Rust types or expose `Pair<A, B>` claiming "no API change":**
+   > 1. Hiding a public upstream Rust struct (such as `pub struct ZipEq<I, J>`) as `internal class` and widening the return type to `Iterator<T>` removes the concrete public type and any type-specific methods from downstream consumers (violating [§ Annotation hiding is not an API repair](#annotation-hiding-is-not-an-api-repair)). Only mark a declaration `internal` when the upstream Rust item is genuinely crate-private (`pub(crate)` / private, as verified for `IsolateAnnex.slots` in `v8-kotlin`).
+   > 2. Returning `Iterator<Pair<A, B>>` on a public API surface introduces `kotlin.Pair<A, B>`, which itself triggers the `KotlinStdlib` `Unchecked cast of 'Any?' to 'Pair<Any?, Any?>'` failure under `-Werror` (see [§ The four hazard classes](#the-four-hazard-classes-what-makes-swift-export-fail-under--werror)). Use a concrete named record class instead of `Pair<A, B>`.
+
+   - Mark genuinely crate-internal unconstrained generic iterator/wrapper classes
      `internal class` (the class itself, its companion factories, and
      any nested sealed subclasses).
    - Public factory functions keep their generic type parameters but
      declare their return type as a stdlib interface
      (`Iterator<T>`, `Sequence<T>`, `Iterable<T>`, `List<T>`, etc.)
-     instead of the concrete internal class. The internal class still
-     implements that interface, so callers get the same behavior with
-     no API change visible to Kotlin or Swift consumers.
+     instead of the concrete internal class **(note: this is an explicit public return-type change, not "no API change")**.
    - Tests in `commonTest` of the same module retain visibility of the
      internal classes via Kotlin's module-private rules, so
      type-specific assertions (`sizeHint`, internal `state`, `putBack`,
@@ -795,9 +786,9 @@ become deletable.
    }
    ```
 
-   Also give `swift-test-harness/Package.swift` the same
+   Also give `src/swift/swift-test-harness` the same
    `platforms: [.macOS(.v14)]`. If a prior failed run cached a bad
-   manifest, clear `swift-test-harness/.build` once.
+   manifest, clear `src/swift/swift-test-harness/.build` once.
 
    **Where Flow-exporting symbols live in the generated package.**
    Inspect the emitted SPM targets and dependencies, including
@@ -900,16 +891,19 @@ sealed class SomeResult {
 
 ## Recipe for hiding unconstrained generic iterator classes
 
-The canonical pattern from itertools-kotlin commit `40513a5`. Applies
-whenever a public Kotlin API exposes a generic class whose type
-parameter is unconstrained (`class Foo<T>`, `class Bar<L, R>`, etc.)
-and the class is reachable through the module's exported surface.
+> [!WARNING]
+> **Historical section (`itertools-kotlin` `40513a5`) — do NOT apply as a blanket rule:**
+> Only mark a generic helper class `internal` when the upstream Rust declaration in `tmp/` is genuinely crate-private (`pub(crate)` or private), and verify that no public subclass inherits erased generic member bridges. Hiding a public upstream Rust struct (such as `pub struct ZipEq<I, J>`) behind `Iterator<T>` removes its concrete type and type-specific methods from public consumers (violating [§ Annotation hiding is not an API repair](#annotation-hiding-is-not-an-api-repair)), and returning `Iterator<Pair<A, B>>` exposes `kotlin.Pair<A, B>`, which triggers `Unchecked cast of 'Any?' to 'Pair<Any?, Any?>'` in `KotlinStdlib.kt` under `-Werror`. See [`template/V2_SWIFT.md` §6.B](file:///Volumes/stuff/Projects/kotlinmania/template/V2_SWIFT.md#kotlin-vs-swift-defect-taxonomy) for current normative API rules.
 
-The principle: **public factories, internal implementations.** Swift
+The historical pattern from itertools-kotlin commit `40513a5` was written
+when a public Kotlin API exposed a generic class whose type
+parameter was unconstrained (`class Foo<T>`, `class Bar<L, R>`, etc.)
+and the class was reachable through the module's exported surface.
+
+The historical rationale was: Swift
 Export only emits bridge code for symbols that are part of the
-public API — `internal` types are skipped. So the offending unchecked
-`Any?` casts disappear if the concrete class is hidden behind a stdlib
-interface return type.
+public API — `internal` types are skipped, so the unchecked
+`Any?` casts on that class disappeared when the concrete class was made `internal` (at the cost of changing the public return type).
 
 ### Before
 
@@ -942,7 +936,12 @@ fun __root___ZipEq_next(self: kotlin.native.internal.NativePtr): kotlin.native.i
 Under `allWarningsAsErrors.set(true)` that warning becomes an error
 and `compileSwiftExportMainKotlin<Target>` fails.
 
-### After
+### After (Historical `itertools-kotlin` `40513a5` snapshot — see warning)
+
+> [!WARNING]
+> **Historical example only — superseded in two respects:**
+> 1. **Visibility parity:** Changing a public class (`ZipEq<A, B>`) to `internal class` and widening `zipEq(...)` to return `Iterator<...>` **is a public API change** (callers lose the concrete `ZipEq` type and its non-`Iterator` methods such as `sizeHint()`). Per [§ Annotation hiding is not an API repair](#annotation-hiding-is-not-an-api-repair), do not hide public upstream Rust types merely to silence Swift Export; only scope declarations `internal` when upstream Rust visibility is `pub(crate)` or private.
+> 2. **No public `Pair<A, B>`:** Returning `Iterator<Pair<A, B>>` exposes `kotlin.Pair<A, B>` in the public API, which triggers `Unchecked cast of 'Any?' to 'Pair<Any?, Any?>'` in generated `KotlinStdlib.kt` under `-Werror` (see [§ The four hazard classes](#the-four-hazard-classes-what-makes-swift-export-fail-under--werror)). Replace public `Pair<A, B>` with a named record class.
 
 ```kotlin
 package io.github.kotlinmania.itertools
@@ -959,12 +958,7 @@ fun <A, B> zipEq(left: Iterator<A>, right: Iterator<B>): Iterator<Pair<A, B>> =
     ZipEq(left, right)
 ```
 
-The class is `internal`, so it never enters the Swift Export bridge.
-The factory's return type changed from `ZipEq<A, B>` (the concrete
-class) to `Iterator<Pair<A, B>>` (the stdlib interface). Kotlin
-consumers in other modules can still call `zipEq(...)` and iterate
-the result; Swift consumers get a bridge for the factory function
-alone, with no `<Any?>` cast.
+In this historical `40513a5` snapshot, making the class `internal` omitted it from the Swift Export bridge and changed the factory's return type from `ZipEq<A, B>` to `Iterator<Pair<A, B>>`. Note that this **does** alter the public API surface (removing concrete `ZipEq` members from external callers) and still leaves `Pair<A, B>` exposed to the stdlib bridge hazard.
 
 ### Tests
 
@@ -1025,9 +1019,7 @@ grep -nE "as io\\.github\\.kotlinmania\\.<pkg>\\.[A-Z][A-Za-z0-9_]+<kotlin\\.Any
     build/SwiftExport/macosArm64/Debug/files/*/*.kt
 ```
 
-Every match is a candidate for the `internal class` + interface-return
-treatment. If grep returns no results, this trigger (8a) doesn't apply
-to this repo and no API change is needed.
+Every match must be evaluated against upstream Rust visibility first: only genuinely crate-private (`pub(crate)` / private) helper classes should be made `internal`, whereas public Rust types must retain their public operations via concrete Swift-bridgeable façades rather than being hidden (see [§ Annotation hiding is not an API repair](#annotation-hiding-is-not-an-api-repair)). If grep returns no results, this trigger (8a) doesn't apply to this repo.
 
 ---
 
@@ -1236,11 +1228,11 @@ signatures:
 
 ```sh
 grep -nE "^(public |internal |private )?(class |object |val |var |fun )[^=]*: \\(.*\\) -> " \
-    src/commonMain/kotlin/**/*.kt
+    src/common/commonMain/kotlin/**/*.kt
 grep -nE "^(public |internal |private )?(class |object |val |var |fun )[^=]*\\(.* \\(.*\\) -> " \
-    src/commonMain/kotlin/**/*.kt
+    src/common/commonMain/kotlin/**/*.kt
 grep -rnE "^typealias [A-Z][A-Za-z0-9_]+ = \\(.*\\) -> " \
-    src/commonMain/kotlin/
+    src/common/commonMain/kotlin/
 ```
 
 If all three passes return no results, trigger 8b doesn't apply and
@@ -1517,15 +1509,18 @@ Two reasons:
 
 - **`swift.yml` runs on `runs-on: macos-26`** — not `macos-latest`. The Kotlin/Native 2.3.x SDK cache requires it.
 - **Never add `maxim-lobanov/setup-xcode@v1`** or any other third-party Xcode setup action. Third-party actions cause `startup_failure` on the KotlinMania allowlist.
-- **`swift test` is wired into the Kotlin `test` task.** A Swift Export failure must surface on `./gradlew test` locally. Do not push and let remote CI find it — by that point you've burned a CI run.
-- **iOS Simulator XCFramework fat-stage rule.** Both `iosSimulatorArm64` AND `iosX64` must be `isStatic = true`. Mixing one static / one dynamic fails `assembleDebugIosSimulatorFatFramework<Name>` with:
+- **`swift test` is wired into the Kotlin `test` / `check` lifecycle.** A Swift Export failure must surface locally. Do not push and let remote CI find it — by that point you've burned a CI run.
+- **iOS Simulator framework static rule (HISTORICAL `iosX64` note).**
+  > [!NOTE]
+  > **Historical target retirement:** `iosX64` (along with all Apple `x86_64` and 32-bit targets) is **RETIRED** workspace-wide per `AGENTS.md` §5.5. Only `iosSimulatorArm64` (with `baseName = frameworkName` and `isStatic = true`) is configured in active builds. The fat-simulator diagnostic below is preserved solely as historical context for pre-retirement commits.
+  Historically, when both `iosSimulatorArm64` and `iosX64` existed, both had to set `isStatic = true`; mixing one static / one dynamic failed `assembleDebugIosSimulatorFatFramework<Name>` with:
   ```
   Cannot create a fat framework from:
     <Name> - arm64 - static
     <Name> - x64 - dynamic
     All input frameworks must be either static or dynamic
   ```
-  This is **gap #7** in the rollout. Earlier rollouts flipped only `iosSimulatorArm64`; if a repo still has the asymmetric shape, fix `iosX64` too in the same commit.
+  This was **gap #7** in the early rollout before `iosX64` was retired.
 
 ### The four hazard classes (what makes Swift Export fail under `-Werror`)
 
@@ -1836,30 +1831,127 @@ Commit `afbebfe` then removed `typealias Type = SynType`,
 `typealias Error = SynError`, and `typealias Result<T> = SynResult<T>`
 after CI confirmed the aliases were exported and rejected by Swift.
 
-### 13. `NoClassDefFoundError: kotlinx/coroutines/internal/intellij/IntellijCoroutines` during Swift Export
+### 13. `NoClassDefFoundError: kotlinx/coroutines/internal/intellij/IntellijCoroutines` during Swift Export (and related Gradle 9.8.1 / KGP 2.4.x wiring)
 
-**Symptom.** The `macosArm64DebugSwiftExport` Gradle task logs an
-`ERROR: Worker exited due to exception` with
-`NoClassDefFoundError: kotlinx/coroutines/internal/intellij/IntellijCoroutines`.
-GitHub Actions annotates the step with a red `##[error]` marker.
+**Symptom.** The `macosArm64DebugSwiftExport` Gradle task fails with:
 
-**Root cause.** The Kotlin compiler embeds parts of the IntelliJ platform
-for its worker processes. The embedded platform expects
-`kotlinx.coroutines.internal.intellij.IntellijCoroutines` on the worker
-classpath, but the Swift Export task's worker process doesn't include
-the `kotlinx-coroutines-core` JAR.
+```
+ERROR: Worker exited due to exception
+java.lang.NoClassDefFoundError: kotlinx/coroutines/internal/intellij/IntellijCoroutines
+```
 
-**Impact.** The error is **non-fatal** — the Swift Export and SPM
-package generation continue past it. The actual build failure (if any)
-comes from downstream compilation errors, not from this worker exception.
-If the only `##[error]` annotations in the Swift CI job are
-`IntellijCoroutines`-related, the Swift Export itself may have succeeded.
+**Root cause.** KGP runs Swift Export in an isolated worker process whose
+classpath is resolved from the `swiftExportClasspath` Gradle configuration
+(not from `buildscript.dependencies`). The embedded IntelliJ platform used by
+the worker requires `kotlinx.coroutines.internal.intellij.IntellijCoroutines`
+(`org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core-jvm`), which is
+omitted from KGP's default `swiftExportClasspath`. Because adding any explicit
+dependency to `swiftExportClasspath` disables KGP's `defaultDependencies`
+callback for that configuration, `org.jetbrains.kotlin:swift-export-embeddable`
+(pinned to the project's Kotlin version) must be added explicitly alongside the
+IntelliJ coroutines artifact.
 
-**Current workaround.** Adding `kotlinx-coroutines-core` to the
-`buildscript` classpath does **not** fix it — the worker process has its
-own classpath that doesn't inherit the buildscript classpath. There is
-no known per-repo fix at this time; the error is filed upstream against
-the Kotlin Gradle plugin.
+**Impact (measured outcome — reconciles earlier stale note).** Contrary to the
+earlier note in this section, this error **is fatal**: when the worker throws
+`NoClassDefFoundError: kotlinx/coroutines/internal/intellij/IntellijCoroutines`,
+`macosArm64DebugSwiftExport` aborts before emitting the generated Swift/Kotlin
+bridge sources and `SPMPackage`.
+
+**Verified fix (already present in `template/build.gradle.kts`).** Populate
+`swiftExportClasspath` with both `swift-export-embeddable` and
+`kotlinx-coroutines-core-jvm`:
+
+```kotlin
+val projectDependencyHandler = project.dependencies
+configurations.configureEach {
+    if (name == "swiftExportClasspath") {
+        dependencies.add(
+            projectDependencyHandler.create("org.jetbrains.kotlin:swift-export-embeddable:$kotlinVersion"),
+        )
+        dependencies.add(
+            projectDependencyHandler.create(
+                "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core-jvm:$intellijCoroutinesVersion",
+            ),
+        )
+    }
+}
+```
+
+#### Related Gradle 9.8.1 / KGP 2.4.x build-graph and strict-gate rules
+
+1. **Gradle 9.8.1 sourceSet DSL (`create` / `getByName`).** Property-delegate
+   helpers (`by creating`, `by getting`) are deprecated in Gradle 9.8.1 and
+   flagged as incompatible with Gradle 10. Use explicit
+   `create("<sourceSetName>") { ... }` and `getByName("<sourceSetName>") { ... }`
+   calls as in `template/build.gradle.kts`.
+2. **JS / WasmJS `test` binary `CompileSync` vs `KotlinJsTest` implicit
+   dependency in Gradle 9.8.1.** In KGP 2.4.x, `KotlinJsCompilation` registers
+   both `DEVELOPMENT` and `PRODUCTION` executables on the `test` compilation,
+   and their `CompileSync` tasks (`jsTestTestDevelopmentExecutableCompileSync`
+   and `jsTestTestProductionExecutableCompileSync`, plus the `wasmJs`
+   equivalents) write into the same npm workspace directory
+   (`build/js/packages/<pkg>-test/kotlin` and
+   `build/wasm/packages/<pkg>-test/kotlin`). In addition,
+   `compileTestProductionExecutableKotlinJs` is `finalizedBy`
+   `jsTestTestProductionExecutableCompileSync`. When `:library:build` and
+   `:library:allTests` run in the same invocation, Gradle 9.8.1 fails
+   `:library:jsBrowserTest`, `:library:jsNodeTest`, `:library:wasmJsBrowserTest`,
+   and `:library:wasmJsNodeTest` with an undeclared implicit dependency on
+   `*TestTestProductionExecutableCompileSync`. Keep `linkTask` and
+   `optimizeTask` wired into `assemble` (so production test linking and
+   Binaryen `wasm-opt` still run), but for
+   `isTestCompilation && mode == KotlinJsBinaryMode.PRODUCTION` omit
+   `linkSyncTask` from `assemble` and set `linkSyncTask.configure { enabled = false }`
+   so only the `DEVELOPMENT` test executable syncs into the shared runner package.
+3. **Keep generated Kotlin bridge warning policy distinct from required strict
+   Swift 6 / `-warnings-as-errors`, and separate compiler, language, and tools
+   versions.**
+   - Generated Kotlin bridge compilation (`compileSwiftExportMainKotlinMacosArm64`
+     under `allWarningsAsErrors = true`) and Swift compilation
+     (`-swift-version 6 -warnings-as-errors`) are distinct gates; neither
+     substitutes for the other.
+   - **Compiler version, Swift language mode (`-swift-version`), and SwiftPM
+     `swift-tools-version` are three independent settings.** A
+     `swift-tools-version: 6.0` test harness does **not** force a generated
+     `swift-tools-version: 5.9` dependency package into Swift 6 language mode.
+     Unless the generated dependency manifest or `XCODE_XCCONFIG_FILE`
+     (`verification/strict-swift.xcconfig` + `verification/enforce_swift6.py`)
+     enforces Swift 6 on the dependency targets, generated modules such as
+     `KotlinRuntimeSupport` and `KotlinCoroutineSupport` compile under
+     `-swift-version 5` while the test target compiles under `-swift-version 6`.
+     Any mixed-mode execution must be explicitly labeled as mixed-mode
+     compatibility rather than full strict Swift 6 dependency compilation.
+   - **Do not copy `oauth2-kotlin`'s generated-Kotlin `-Werror` disable or
+     `swift-tools-version: 5.9` rewrite as a strict fix.** Scoping
+     `allWarningsAsErrors = false` onto `compileSwiftExportMain*` or rewriting
+     manifests to tools 5.9 / Swift 5 mode masks diagnostics rather than
+     repairing the exported contract.
+   - **Zero executed tests and green CI job labels are not acceptance.** Every
+     validation report must inspect the exact final replacement head and record
+     actual executed test counts across all KMP targets and Swift
+     (`Test run with <N> tests`).
+
+#### Controlled 2x2 Swift 5 vs Swift 6 dependency language-mode diagnostic across `async-trait-kotlin` (Kotlin 2.4.21) and `openssl-sys-kotlin` (Kotlin 2.4.20) under Swift 6.3.3
+
+Controlled diagnostics in `async-trait-kotlin` (`automation-artifacts/2026-10-20-async-trait-swift-mode-diagnostic/`, frozen head `685c3dacb8afaa2999f49cc2711ca82408df5540`, KGP/exporter `2.4.21`) and `openssl-sys-kotlin` (`automation-artifacts/2026-10-20-openssl-sys-swift-mode-diagnostic/`, frozen head `23623166c6e007b66ff4d3615abed86ae4d54657`, KGP/exporter `2.4.20`) tested whether stock Kotlin Swift Export emits dependency bridge sources compatible with Swift 5 language mode that fail under Swift 6 while consumer test targets remain in strict Swift 6 (`-swift-version 6 -warnings-as-errors`):
+
+1. **Generation is invariant to Swift language mode (`javap` + `2.4.20` vs `2.4.21` bytecode audit).**
+   - `SwiftExportTask` -> `SwiftExportAction` -> `SwiftExportRunnerKt.runSwiftExport` (`SwiftExportConfig` + `SwiftModuleConfig`) has no parameter, branch, or gate for Swift compiler version, `swift-tools-version`, or `-swift-version`. Neither Kotlin `2.4.20` nor Kotlin `2.4.21` restricts generation to Swift `< 6`.
+   - Entry-by-entry SHA256 inspection (`javap-2.4.20-vs-2.4.21.json`, SHA256 `c428af050d775f702c4147803e60183da1be7b2d482b2d8cc3e2842b1017e1ea`) between `swift-export-embeddable-2.4.20.jar` (`24c6159bcf0087ecf86bfc9bad01a975e192abcf75005b248292d85a139c2055`) and `swift-export-embeddable-2.4.21.jar` (`615e8a032f47baa15bc6126cbffe707c87069445b215ecce7c4830d13b079180`) proves that **`6,262` of `6,263` JAR entries are 100% byte-for-byte identical** (only `META-INF/MANIFEST.MF` differs; **all `681` `swiftexport` + `sir` class and resource entries are byte-identical**). Likewise, between `kotlin-gradle-plugin-2.4.20-gradle96.jar` (`6f49688f2c6715d60f5dc52d4c1ada992ce4bed6053d1bd6e579c9392d7ba0ed`) and `kotlin-gradle-plugin-2.4.21-gradle96.jar` (`d0a11912936c8801f1773a47e8fc51835a6ab568d73e4e1d188281955a7f575b`), **all `144` `org/jetbrains/kotlin/gradle/plugin/mpp/apple/swiftexport/*` class entries are 100% byte-for-byte identical**.
+   - Consequently, shared generated runtime files are byte-identical across both projects and both Kotlin versions (`KotlinRuntimeSupport.swift`: `3cf1d7fb7b1177a62400397dc94f8207ada3b26a955c09594def8ab8ee620560`, `KotlinCoroutineSupport.swift`: `883cec935c34af1380ca1e59a5e78af498349cb152c79aeb6878216fc097dc04`, `KotlinRuntimeSupport.kt`: `caf6da985fe941dbd1b0dcdfcf2c572f7ffe63cea6d91c8b9cabaaf248804f1f`, `KotlinCoroutineSupport.kt`: `e63496593d0ae8e63c7d7180c0bfa0a07c23f63d998e06459e8b6878eded26fe`, `KotlinBase.h`: `14390b9a40bcd8f924909692249ca95468cd3de36157be762371b1673dab86f3`).
+   - `SPMManifestGenerator.generateManifest` (`GenerateSPMPackageFromSwiftExport.kt:167`) hardcodes `// swift-tools-version: 5.9` and omits `platforms:` and `swiftLanguageModes`. Under Swift 6.3 (`swiftlang-6.3.3.1.3`), SwiftPM defaults every target in a `swift-tools-version: 5.9` dependency package to `-swift-version 5` even when consumed by a `swift-tools-version: 6.0` test harness.
+   - `BuildSPMSwiftExportPackage` (`BuildSPMSwiftExportPackage.kt:103-154`) invokes `xcodebuild` without `SWIFT_VERSION=6` or `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`, so KGP's built-in `macosArm64DebugBuildSPMPackage` compiles the generated `SPMPackage` in Swift 5 language mode without `-warnings-as-errors`.
+2. **Generated Kotlin bridge compilation (`compileSwiftExportMainKotlinMacosArm64` with `allWarningsAsErrors = true`).**
+   - Stock `2.4.20`/`2.4.21` `TypeBridging.kt:337` (`Bridge$AsVoid$inKotlinSources$1.kotlinToSwift`) emits `run { _result; true }` for `Unit`-returning bridges while `KotlinBridgePrinter` emits only `@file:kotlin.Suppress("DEPRECATION_ERROR")`.
+   - **Stage 2a (stock unmodified `.kt` bridges under `-Werror`)**: fails in `async-trait-kotlin` with `0` errors and `1,404` warnings (`1,396` `UNUSED_EXPRESSION`, `4` `UNCHECKED_CAST` on `Array<Any?>` in `KotlinStdlib.kt`, and `4` warnings in `KotlinCoroutineSupport.kt`) and fails in `openssl-sys-kotlin` with `0` errors and `193` warnings (`189` `UNUSED_EXPRESSION`, `0` `Array<Any?>` casts because only primitive `ByteArray`/`IntArray`/`UIntArray`/`ULongArray` bridges are emitted, and `4` warnings in `KotlinCoroutineSupport.kt`).
+   - **Stage 2b (separate Kotlin warning-suppression intervention — NOT an unchanged-source or unchanged-warning-policy mode-only result)**: To link `libSwiftExportBinary.a` (`fc5cf8f9...` in `async-trait-kotlin` -> merged `libAsyncTrait.a` `524239bd00a82d37222a0a2f6febc172be8fe155de922f39f0bc92ea279b39ac`; `62a59116...` in `openssl-sys-kotlin`) for the downstream Swift 5 vs Swift 6 dependency language-mode comparison, line 1 of the generated `.kt` files was extended with `"UNUSED_EXPRESSION", "UNCHECKED_CAST", "USELESS_ELVIS_RIGHT_IS_NULL", "OPT_IN_USAGE", "OPT_IN_TO_INHERITANCE"` (after an initial 4-key attempt in `async-trait-kotlin` failed on `KotlinCoroutineSupport.kt:42:34` `USELESS_ELVIS_RIGHT_IS_NULL`; see `command-log-manifest.json` SHA256 `25aac62c34c40e11cd10c7d35c3ce9687453af01294e3bcee37b64f6ed3588c0` and `post-suppression-kt-sha256.txt` SHA256 `d3f332e5cf2a5eb84b6d37a0aeb1b90f571949a3f16bf409d1c844f791f26d04`). Because this modifies generated `.kt` source headers to suppress warnings, it is explicitly classified as a separate Kotlin warning-policy intervention.
+3. **2x2 Factorial Swift Compilation & Execution Across Both Projects (identical stock `.swift`/`.h` files; consumer test targets always compiled with `-swift-version 6 -warnings-as-errors`):**
+   - **Arm A1 (Dependency `-swift-version 5`, no dependency `-warnings-as-errors`; Consumer `-swift-version 6 -warnings-as-errors`):**
+     - In `async-trait-kotlin`: all **8** generated dependency modules and both Swift 6 consumer test targets compile and link with **0 errors** (22 dependency warnings, 0 consumer warnings). Under `--no-parallel`, all **8 consumer tests execute** (`7/8` pass on unmodified `AsyncTraitTests.swift`; `exposesConcreteDiagnosticMessages` fails at line 85 only because `parseArgs(tokens: tokens)` at line 74 calls `proc-macro2-kotlin` `TokenStream.intoIter()` -> `Rcvec.makeOwned()`, which drains `tokens.inner` in-place to `[]` before line 84 reuses `tokens`, and passes **`8/8`** when given a fresh `TokenStream`; `--parallel` crashes with `ArrayIndexOutOfBoundsException` because `proc-macro2-kotlin` `Fallback.kt:266` `SourceMap` uses an unsynchronized process-wide `mutableListOf<FileInfo>()`).
+     - In `openssl-sys-kotlin`: all **5** generated dependency modules compile with **0 errors** (15 dependency warnings). Unchanged `OpensslSysExportTests.swift` fails consumer compilation on `OpensslSys.NID_sha256` (renamed to `NID_SHA256` in commit `93a22e0`); **Supplementary Arm A1-S** (aligning `NID_SHA256` in the test while keeping all generated files and flags identical) compiles with 0 consumer warnings/errors and passes **`3/3` serial** and **`3/3` parallel** tests.
+   - **Arm B1 (Dependency `-swift-version 6`, no dependency `-warnings-as-errors`; Consumer `-swift-version 6 -warnings-as-errors`):** In **both** `async-trait-kotlin` and `openssl-sys-kotlin` (including Supplementary Arm B1-S), switching dependency language mode from `5` to `6` fails compilation in `KotlinCoroutineSupport.swift:66:13` and `91:17` (`error: capture of 'cancellation' with non-Sendable type 'KotlinTask' in a '@Sendable' closure [#SendableClosureCaptures]`) and adds Swift 6 `Sendable` diagnostics in `KotlinRuntimeSupport.swift:5:16` (`stored property 'wrapped' of 'Sendable'-conforming struct 'KotlinError' has non-Sendable type 'KotlinBase'`). `0/8` (`async-trait-kotlin`) and `0/3` (`openssl-sys-kotlin`) consumer tests execute.
+   - **Arms A2 & B2 (Dependency `-warnings-as-errors` enabled under `-swift-version 5` or `6`):** In **both** projects, passing global `-Xswiftc -warnings-as-errors` on the `swift test` CLI propagates `-warnings-as-errors` to all dependency targets, failing in `KotlinRuntimeSupport.swift` (`3` errors in Swift 5 mode; `5`–`8` errors across `KotlinRuntimeSupport.swift` and `KotlinCoroutineSupport.swift` in Swift 6 mode).
+   - **Labeling and non-acceptance qualification:** Any run where dependency modules compile under `-swift-version 5` while consumer tests compile under `-swift-version 6` is **mixed-mode compatibility** and must never be reported as strict Swift 6 dependency compilation. **Neither diagnostic comparison is an accepted strict production gate:** Arm A1 disables dependency `-warnings-as-errors` and relies on the separate Stage 2b `.kt` `@file:kotlin.Suppress` intervention to link the Kotlin/Native static archive, while Arms B1, A2, and B2 execute `0` cases. See `automation-artifacts/2026-10-20-async-trait-swift-mode-diagnostic/report.json` (SHA256 `7902e419248e09a0868e0d989863a508c7d28a713e106a20e183d52aaec41ae3`), `provenance-and-two-project-matrix.json` (SHA256 `466eafc85f690576eb7e318ecab7b22177b667d38711c7dce7c128125a66c7bd`), `automation-artifacts/2026-10-20-openssl-sys-swift-mode-diagnostic/report.json` (SHA256 `2ff2e0380ba11b70839a31ab086537b0a8797970212ebefaf3e66605db135226`), and Syn's compatibility references below (`3364aa7a3ddb76aea2357f0329c367365bf796b1` and `db24b934e8db9b0d843a83f3902d9db057e65e67` in `syn-kotlin` PR #166).
 
 ### 14. Custom sealed generic result types in public API cause argument type mismatch in Swift Export bridge
 
@@ -1893,6 +1985,91 @@ predicates bridges cleanly.
 `Type` / `Error` / `Result` became `SynType` / `SynError` / `SynResult`,
 and the compatibility aliases were removed after CI proved aliases are
 exported too.
+
+<a id="15-backticked-kotlin-reserved-keywords-on-public-declarations-emit-unbackticked-calls-in-the-swift-export-kotlin-bridge"></a>
+### 15. Backticked Kotlin reserved keywords on public declarations emit unbackticked calls in the Swift Export Kotlin bridge
+
+**Symptom.** `compileSwiftExportMainKotlinMacosArm64` fails on generated
+`build/SwiftExport/macosArm64/Debug/files/<Module>/<Module>.kt` with:
+
+```
+Cannot infer type for type parameter 'R'. Specify it explicitly.
+Reference has a nullable type 'Nothing?'. Use explicit '?.invoke' to make a function-like call instead.
+No receiver can be passed to this function or property.
+```
+
+**Root cause.** When a public Kotlin function or property is named with a
+backticked Kotlin hard keyword to match upstream Rust identifiers (such as
+`` fun `null`(): UnsafeRawIsolatePtr `` or `` fun `this`(): Object ``),
+the Swift Export bridge generator emits unbackticked Kotlin call sites in
+the generated `.kt` bridge file:
+
+```kotlin
+val _result = run { __self.null() }
+// or:
+val _result = run { __self.this() }
+```
+
+The Kotlin compiler parses `__self.null()` as attempting to invoke the literal
+`null` (of type `Nothing?`) with `__self` as a receiver rather than calling the
+method named `` `null` ``, and parses `__self.this()` as invalid `this` syntax.
+
+**Fix.** Expose a non-keyword public name for Kotlin and Swift consumers
+(e.g., `fun nullValue()` / `fun thisValue()`) and scope the backticked
+keyword alias to `internal` (e.g., `` internal fun `null`() = nullValue() ``,
+`` internal fun `this`() = thisValue() ``). Because Swift Export only bridges
+`public` declarations, the invalid unbackticked bridge call is never emitted
+while internal callers and `ast_distance` symbol parity still match the exact
+upstream Rust identifier:
+
+```kotlin
+// Before (breaks compileSwiftExportMainKotlinMacosArm64)
+public fun `null`(): UnsafeRawIsolatePtr = UnsafeRawIsolatePtr(null)
+
+// After (bridges cleanly to Swift while preserving internal Rust parity)
+public fun nullValue(): UnsafeRawIsolatePtr = UnsafeRawIsolatePtr(null)
+internal fun `null`(): UnsafeRawIsolatePtr = nullValue()
+```
+
+**Evidence.** Discovered and independently verified in `v8-kotlin` ([PR #121](https://github.com/KotlinMania/v8-kotlin/pull/121), merged to `main` at `4be04116172bd955580511da3ab264eb69797c00`; retained step logs in `/Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/`):
+- **Retained bridge snippet & compiler failure (Step `1878` & [`steps/1874/output.txt`](file:///Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/1874/output.txt), `SHA256: e197fb6d905f6d523b6d18145c57fa9ad519f200d5566aa04c61c565c0f8d22c`):** Generated `V8.kt:12310-12315` emitted `val _result = run { __self.null() }`, failing `compileSwiftExportMainKotlinMacosArm64` at `V8.kt:12313:19` (`Cannot infer type for type parameter 'R'`) and `V8.kt:12313:32` (`Reference has a nullable type 'Nothing?'` / `No receiver can be passed to this function or property`).
+- **Source locations:**
+  - `src/common/commonMain` lines `83, 85`: `` internal fun `null`(): UnsafeRawIsolatePtr = nullValue() `` paired with `public fun nullValue(): UnsafeRawIsolatePtr = UnsafeRawIsolatePtr(null)`.
+  - `src/common/commonMain` lines `127, 129` (`PropertyCallbackArguments`) and lines `179, 181` (`FunctionCallbackArguments`): `` internal fun `this`(): Object = thisValue() `` paired with `public fun thisValue(): Object`.
+- **Qualification:** This preserves the public operations for Kotlin and Swift consumers via an explicit **project-specific public spelling migration** (`nullValue()` / `thisValue()`); it is **not** a repair of the Swift Export bridge generator itself and must **not** be cited to justify hiding public APIs without a public replacement. The Syn producer owner received the exact regression evidence and recorded backticked-keyword escaping in [`kotlin-swift-export-tooling/verification/UPSTREAM_ISSUES.md`](file:///Volumes/stuff/Projects/kotlinmania/kotlin-swift-export-tooling/verification/UPSTREAM_ISSUES.md) (local documentation only; no external upstream issue was filed).
+
+<a id="16-public-mutablemap--mutableset--mutablelist-properties-trigger-global-ktypewkotlincollectionsmutableset-already-exists-during-static-linking"></a>
+### 16. Public `MutableMap` / `MutableSet` / `MutableList` properties trigger `Global 'ktypew:kotlin.collections.MutableSet' already exists` during static linking
+
+**Symptom.** `linkSwiftExportBinaryDebugStaticMacosArm64` fails during LLVM
+bitcode generation (`ObjCExportCodeGenerator.emitCollectionConverters`) with:
+
+```
+e: Compilation failed: Global 'ktypew:kotlin.collections.MutableSet' already exists
+java.lang.IllegalArgumentException: Global 'ktypew:kotlin.collections.MutableSet' already exists
+```
+
+**Root cause.** Even when `MutableSet` never appears directly in your repo's
+source code, exposing a public `MutableMap<K, V>` property on any public class
+(for example, `val slots: MutableMap<K, V>`) causes Swift Export to bridge
+`kotlin.collections.MutableMap` in `KotlinStdlib.kt`. That in turn transitively
+bridges `MutableMap.entries` and `MutableMap.keys` as
+`kotlin.collections.MutableSet` (`KotlinStdlib.kt:20` `@file:BindClassToObjCName(kotlin.collections.MutableSet::class, ...)` plus reverse `entries`/`keys` bridges at `KotlinStdlib.kt:341, 351`), which collides with Kotlin/Native's
+`ObjCExport` writable type-info globals (`ktypew:kotlin.collections.MutableSet`)
+when linking the static archive.
+
+**Fix.** Inspect `build/SwiftExport/macosArm64/Debug/files/<Module>/<Module>.swift`
+for `ExportedKotlinPackages.kotlin.collections.MutableMap` (or `MutableSet` /
+`MutableList`) to pinpoint the declaration pulling mutable stdlib collections
+into the bridge. Check upstream Rust visibility first: if the declaration is
+genuinely crate-private (`pub(crate)` or private in `tmp/`), scope it to
+`internal`; if it is genuinely part of the upstream public API, evaluate a reviewed migration to an immutable `Map<K, V>` / `Set<T>` / `List<T>` view plus explicit typed mutation methods rather than removing public mutation capabilities.
+
+**Evidence.** Discovered and independently verified in `v8-kotlin` ([PR #121](https://github.com/KotlinMania/v8-kotlin/pull/121), merged to `main` at `4be04116172bd955580511da3ab264eb69797c00`):
+- **Retained failure log ([`steps/1904/output.txt`](file:///Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/1904/output.txt), `SHA256: 4eba8703b0e74c84a6b899d252aa2a2d6e05b3fbb722c9b0ed1334bf8767ceaf`):** `KotlinStdlib.kt:20` (`BindClassToObjCName` on `MutableSet`) + reverse `entries`/`keys` bridges at `KotlinStdlib.kt:341, 351` triggered `Global 'ktypew:kotlin.collections.MutableSet' already exists`.
+- **Upstream Rust parity:** `src/common/commonMain` (`internal val slots: MutableMap<String, Any> = mutableMapOf()`) on `class IsolateAnnex internal constructor(...)` corresponds to upstream Rust `tmp/v8/src/isolate.rs:1899` (`pub(crate) struct IsolateAnnex`) and its private field `slots: HashMap<TypeId, RawSlot, BuildTypeIdHasher>` at line `1901`. Making `slots` `internal` is therefore faithful crate-private visibility alignment, **not** hiding a public upstream Rust API.
+- The Syn producer owner received the exact regression evidence and recorded the `ktypew:kotlin.collections.MutableSet` duplicate-global symbol collision in [`kotlin-swift-export-tooling/verification/UPSTREAM_ISSUES.md`](file:///Volumes/stuff/Projects/kotlinmania/kotlin-swift-export-tooling/verification/UPSTREAM_ISSUES.md) (local documentation only; no external upstream issue was filed).
+- **Build-mode and test-count qualification on `v8-kotlin` (`4be04116172bd955580511da3ab264eb69797c00`):** Passing Step `1942` ([`steps/1942/output.txt`](file:///Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/1942/output.txt), `SHA256: ee9995f8033abadf5fe5ee135617c0207ed80ec7370a6abab75a114871240228`) executed **1 Swift Testing test (`testSwiftModuleLoads`, passed)** exercising real `PropertyAttribute`, `PropertyFilter`, `HandlerFlags`, `MicrotasksPolicy`, and `version` operations (despite XCTest's separate `0` summary). However, retained `.build/arm64-apple-macosx/debug/description.json` (`SHA256: 8928e61883026d1a103582e9c599ba389f804abd5a1f077bea29b814da4c0d92`) and `v8-kotlin/build.gradle.kts` (`lines 370–374, 1389, 1474`) confirm that `v8-kotlin` disabled generated Kotlin bridge `-Werror`, rewrote `swift-tools-version: 6.0` $\to$ `5.9`, and compiled all Swift targets **without `-warnings-as-errors`** (see item 5 at the end of this document).
 
 ## Reproducing the isolated Kotlin 2.4.20 Swift bridge repair (2026-10-20)
 
@@ -2011,7 +2188,7 @@ Preparation refuses unexpected source state; do not overwrite a previous run or 
 
 `isolation.init.gradle` sets layout.buildDirectory before project configuration, selects only the verified exporter on the original compiler worker classpath, redirects Node/Yarn locks and SwiftPM dependency checkout paths, and rejects declared task outputs outside the artifact root. Gradle, Konan, Kotlin persistent state, Java temporary/user/IDE directories, Android user/AVD state, Swift/Clang module caches, npm/Yarn caches and all products are isolated. `native-sdk/` and `konan-data/` are owned input copies. The init script removes only the known appended GenerateSPMPackage action that rewrites generated source/manifest; the real generation action remains. Preflight observed StandardTaskAction plus AbstractTask$TaskActionWrapper. The later action receipt captured a mutable action list after mutation, so its original_actions field is incomplete; the preflight inspection and removed-wrapper field are the evidence for the two-action starting state.
 
-The strict Swift build uses `strict-swift.xcconfig` with warnings as errors. `run-real-swift-tests.rb` invokes the existing shared `swift-test-harness` with artifact-local SwiftPM scratch/package/config/security/module paths, Swift 6 and `-Xswiftc -warnings-as-errors`, targeting macOS ARM64 15.0. It replaces the outer smoke runner's nested Gradle invocation, retaining the real embed dependency and six real test bodies. No generated output was patched to force a pass.
+The strict Swift build uses `strict-swift.xcconfig` with warnings as errors. `run-real-swift-tests.rb` invokes the existing shared `src/swift/swift-test-harness` with artifact-local SwiftPM scratch/package/config/security/module paths, Swift 6 and `-Xswiftc -warnings-as-errors`, targeting macOS ARM64 15.0. It replaces the outer smoke runner's nested Gradle invocation, retaining the real embed dependency and six real test bodies. No generated output was patched to force a pass.
 
 Observed results:
 
@@ -2293,10 +2470,330 @@ Actual enum execution80224 preserved all six cases and added explicit Empty(rawV
 
 Read-only hosted correlation: OpenTelemetry Appender Tracing run39531269242, head9f454783dd88e0da231474c21197e15c50ea5623, Swift job118997464324 fails the known RuntimeSupport implementationOnly/library-evolution and wrapped:KotlinBase Sendable diagnostics. Its actual runtime frontend uses Swift6/Werror. The later IDERunDestination empty-platform/multiple-AnyMac warnings are separate from those compiler errors; this log does not establish a destination-selection defect or justify a template workaround. Diagnosis receipt SHA256 **77dcc44ca2bee956c656379b7ef0595e6b53e8d63df0d1816b1dc7e483d09ada** is under automation-artifacts/2026-10-20-syn-isolated-library-validation/opentelemetry-ci-39531269242. No repository edit, CI restart or Iris interaction was performed.
 
-### Concrete production delivery proposal and official artifact inspection
+### Concrete production delivery proposal and official artifact inspection (Historical `DELIVERY.md` snapshot-break checkpoint — superseded by `DELIVERY_CURRENT.md`)
 
-Read-only Central inspection on21October2026 found latest non-prerelease2.4.21 and latest preview2.5.0-Beta1. Actual published2.4.20,2.4.21 and2.5.0-Beta1 artifacts all retain the implementation-only bridge import and KotlinError.wrapped:KotlinBase storage. Central SHA1 checksums were verified and artifact/resource SHA256 values recorded. The preview additionally consumes wrapped in reverse-error identity paths, so the2.4.20 String-snapshot resource is not a drop-in upgrade for it. No preview compiler or consumer build was run. Exact evidence is production-delivery/official-artifact-inspection.json under the existing Syn isolated-validation artifact root, SHA256 **f9f9111f8f00706e85890bc7b4934c1ea9d481f60571c0c4866e5a8a5058b835**. The index lists no examined official compatible release containing the tested repair; this is not an all-historical-versions claim.
+> [!NOTE]
+> **Historical checkpoint — superseded by [`DELIVERY_CURRENT.md` (`70d733a`)](#consolidated-api-preserving-delivery-reference-70d733a--delivery_currentmd-and-procmacro2-mixed-mode-validation-3d8718c):** The earlier `DELIVERY.md` proposal below assumed that removing `KotlinError.wrapped` (the snapshot-break candidate) was required. That assumption is **superseded** by the validated API-preserving closure (`exporter 32f6c1ac...` + `header 99186d1d...` at `db24b93` / `70d733a`, documented in `syn-kotlin/verification/swift-exporter-patches/syn-library/DELIVERY_CURRENT.md`, SHA256 `92110deb7f5af5a5020afd4e1b9449f2d4e5ba8bbd110ef97048091eee039744`), which preserves `public var wrapped: KotlinBase` without an API break. Do not treat `KotlinError.wrapped` removal as mandatory.
 
-The concrete proposal in syn-kotlin/verification/swift-exporter-patches/DELIVERY.md names repository **KotlinMania/kotlin-swift-export-tooling** and immutable coordinate **io.github.kotlinmania:swift-export-embeddable:2.4.20-km.1**, with ProcMacro2 as the first adoption scope. Both remain proposals; read-only checks found no accessible repository at that path and Central returned404 for that version. The proposal uses the existing KotlinMania publishing namespace, subject to publisher access verification, rather than JetBrains coordinates or an assumed new tooling namespace. It describes exact patch ordering, pinned official base/bootstrap/source closure, two deterministic source-patch builds, full class/resource/ABI audits, Apache/bundled licensing and modification notices, exact-final CI/main CI/tagged Central Portal publication, independent published-artifact verification and consumer rollback. It explicitly distinguishes this source-patch assembly from rebuilding every unchanged Kotlin compiler module. Licensing/provenance additions require a new reviewed final artifact hash and renewed validation.
+Read-only Central inspection on 21 October 2026 found latest non-prerelease 2.4.21 and latest preview 2.5.0-Beta1. Actual published 2.4.20, 2.4.21 and 2.5.0-Beta1 artifacts all retain the implementation-only bridge import and KotlinError.wrapped:KotlinBase storage. Central SHA1 checksums were verified and artifact/resource SHA256 values recorded. The preview additionally consumes wrapped in reverse-error identity paths, so the 2.4.20 String-snapshot resource is not a drop-in upgrade for it. No preview compiler or consumer build was run. Exact evidence is production-delivery/official-artifact-inspection.json under the existing Syn isolated-validation artifact root, SHA256 **f9f9111f8f00706e85890bc7b4934c1ea9d481f60571c0c4866e5a8a5058b835**. The index lists no examined official compatible release containing the tested repair; this is not an all-historical-versions claim.
 
-The production decision is whether to authorize that named repository/component release after its gates and explicit ProcMacro2-only pinning, accepting removal of KotlinError.wrapped and diagnostic snapshot semantics, while submitting upstream patches in parallel; otherwise use a verified future official release. This is not another diagnostic-permission request. No repository creation, upstream submission, publication, production pin, installed-tool change or fleet rollout has occurred. Matching scope remains KGP/Native2.4.20 and the recorded Swift6.3.3/coroutines1.11.0 inputs. The original22 asynchronous cases and each other consumer own their separate gates.
+The concrete proposal in syn-kotlin/verification/swift-exporter-patches/DELIVERY.md names repository **KotlinMania/kotlin-swift-export-tooling** and immutable coordinate **io.github.kotlinmania:swift-export-embeddable:2.4.20-km.1**, with ProcMacro2 as the first adoption scope. Both remain proposals; read-only checks found no accessible repository at that path and Central returned 404 for that version. The proposal uses the existing KotlinMania publishing namespace, subject to publisher access verification, rather than JetBrains coordinates or an assumed new tooling namespace. It describes exact patch ordering, pinned official base/bootstrap/source closure, two deterministic source-patch builds, full class/resource/ABI audits, Apache/bundled licensing and modification notices, exact-final CI/main CI/tagged Central Portal publication, independent published-artifact verification and consumer rollback. It explicitly distinguishes this source-patch assembly from rebuilding every unchanged Kotlin compiler module. Licensing/provenance additions require a new reviewed final artifact hash and renewed validation.
+
+The production decision is whether to authorize that named repository/component release after its gates and explicit ProcMacro2-only pinning, accepting removal of KotlinError.wrapped and diagnostic snapshot semantics, while submitting upstream patches in parallel; otherwise use a verified future official release. This is not another diagnostic-permission request. No repository creation, upstream submission, publication, production pin, installed-tool change or fleet rollout has occurred. Matching scope remains KGP/Native 2.4.20 and the recorded Swift 6.3.3/coroutines 1.11.0 inputs. The original 22 asynchronous cases and each other consumer own their separate gates.
+
+### Fresh production-default ProcMacro2 Swift failure
+
+The official production exporter still fails at ProcMacro2 head **3d8718c2412be6aa99175ab88663edec8dbfa6db**, [run39534052281 Swift job119006447304](https://github.com/KotlinMania/proc-macro2-kotlin/actions/runs/39534052281/job/119006447304), after catalog alignment and the targeted swiftExportSmokeTest entry. Independent log inspection confirms the actual KotlinRuntimeSupport frontend uses Swift6/Werror. Located errors are RuntimeSupport.swift1:22 implementation-only import without library evolution,5:16 wrapped:KotlinBase non-Sendable storage, and2:1 the preconcurrency suggestion, which was not applied. Zero of the three Swift cases executed. The retained log is automation-artifacts/2026-10-20-proc-macro2-publication-repair/current-head-production-ci/proc-macro2-kotlin-swift-119006447304.log, SHA256 **1fb088fbdfc45b55c6764b9e2044b0e34e15149a0deae45f99bda43cfb079149**.
+
+This is a production-default negative at a different source revision from isolated91639/component57182, whose actual Native build and three Swift cases passed. Preserve both results; neither implies production adoption or a published compatible producer. The existing owner continues monitoring the original production runs. No duplicate CI, producer selection change or repository source edit was performed for this documentation update.
+
+### Distinct recursive-bound exporter failure in BitFlags
+
+Actual BitFlags source **32d45a573509701d67d5f2697178b7bccdba4b9c** fails during macosArm64DebugSwiftExport, before generated Native bridge/runtime compilation. Its single direct stacktrace execution15478 records 73 repetitions through UpperBoundTypeProjectionRenderer and KaTypeRenderer. Raw stacktrace SHA256 **6db4b70770ccaf71aa09477257eddb623e3f1a4228c228aefb80417c73cad954** is retained under automation-artifacts/2026-10-20-ansi-pr99/bitflags-public-flags. The explicit exporter version and retained task-history path match official2.4.20 artifact24c615; the full worker classpath was not captured. Separate JVM signature inspection is not Native/Swift proof.
+
+Pinned TypeRenderer.kt source at revision890ac1d, Git blob **5a64ea9f1dd8b33c02533e03646cf1b03ef3ec87**, replaces a type parameter with its single upper bound and recursively renders it with the same renderer. A genuine B:Flags<B> bound therefore re-enters B. Exact SirFunctionFromKtSymbol.buildForwardKotlinCall lines143–151 uses the renderer output as explicit generic arguments in generated Kotlin calls, so this is not only diagnostic formatting. The first triggering exported declaration is not isolated. A terminating Any/star/Nothing substitution is not accepted without proving the generated recursive-bound call and behavior. Published2.4.20 and2.4.21 have identical projection-renderer class bytes; the preview differs and was inspected but not executed.
+
+Syn verification/swift-exporter-patches/RECURSIVE_BOUNDS.md records the mechanism and validation contract. Independent classification receipt SHA256 **f8ae59a7d3e51df42752143d266ee45db9172330a0bc60eb5721b37214f3101b** is under the existing Syn isolated-validation production-delivery artifact directory. Preserve actual bounds, flags widths, public APIs and Native/Swift gates. Component57182 is not claimed to repair this new family, and its ProcMacro2/enum successes remain separate. This classification used read-only source/log/tool inspection, with no consumer or producer code edit and no duplicate compiler/CI run.
+
+### Executed recursive-bound factory reproduction and rejected inference candidate
+
+A genuine authored recursive factory fixture now reproduces stock2.4.20 StackOverflowError in actual79429 after its main Kotlin/Native library compiles. The complete exporter tooling classpath is captured and hashed. Separately, a one-input captured factory call compiled/linked under Native2.4.20/Werror in34733 and its ARM64 Mach-O executable passed identity/value assertions in77287. Actual19399 rejects two independently erased inputs because their captured B types are unrelated. This is Native evidence, separate from JVM and Swift.
+
+The experimental inferred-call source avoids recursive explicit-bound rendering without replacing the bound. Reconstructing unchanged SirFunctionFromKtSymbol requires same-module AnnotationUtils, lazyWithSessions and TypeTranslationUtils plus the supported name-based destructuring syntax flag. Actual30095 matches all14 baseline classes' signatures, instructions and full member flags with the unchanged comparator. Candidate25902 compiles; audit11305 finds only one changed call body and two private helpers(flags18/26). Isolated d0d307231e0dc02dbfa6749aa607ba3d3e3348ebabc2a0f1bac7384b65ff8bd1 changes one existing class atop57182,6263 file entries, no additions/removals.
+
+Actual71898 passes export generation, then fails the actual generated Native bridge with five errors. The two-input factory cannot infer one shared recursive type; allocation/initialization emit FlagIterator<Flags<*>>, violating the real bound. Untouched generated source also requires a public-factory visibility check. This candidate is **rejected as a complete repair**, not included in the accepted delivery patch order, and not installed/adopted/published. Native bridge linking and Swift tests did not execute. Preserve the positive direct Native source test, stock crash, and generated Native failure as separate results. Next correction must retain shared generic relationships and well-typed class allocation before strict Swift behavior tests.
+
+Durable authored fixtures, rejected patch and exact result hashes are in syn-kotlin/verification/swift-exporter-patches/recursive-bounds. Raw inputs/commands/logs and generated source remain in automation-artifacts/2026-10-20-syn-isolated-library-validation/recursive-bound-repair. Checkpoint SHA256 **43af6f95180239a47ec5aec77d847928297bec708eb65bc46386fd2b370290f2**. None of the earlier ProcMacro2/enum success is claimed to fix this recursive family.
+
+### Rust reference tooling and release contents
+
+Sydney permits local manually run reference tooling while requiring vendored frozen Rust to be absent from published code. Preserve the shared reference trees; do not delete them to satisfy a packaging boundary. Publication/adoption/external submission of the proposed exporter component remains unapproved.
+
+Direct inventory of57182 finds6263 files:6228 host-tool classes,22 Kotlin module metadata files,6 XML files,1 manifest and6 runtime source resources(2 Kotlin,2 Swift,2 C headers). There are no Rust source/Cargo manifest or lock entries. The nine ordered repair patches touch eight distinct Kotlin/Swift/C-header files; no Rust patch is involved. Syn tracks no Rust/tmp reference sources. This is an inspected-entry/source-closure statement, not a complete implementation-origin or transitive licensing certification. It does not turn Kotlin/Native product output into a JVM library.
+
+A no-vendored-frozen-Rust option keeps patches/manifests/fetch recipes and retrieves official Kotlin inputs by immutable revision/blob/checksum at build time. Local Rust oracles and toolchain trees remain outside publication staging, source archives and product dependencies. Final source/binary archives must be explicitly allowlisted and inspected before any separately approved publication. Licensing/notices/SBOM, deterministic rebuilds, artifact-derived header provenance and exact Native/Swift gates remain requirements; no release staging exists. Exact inventory SHA256 **cc83fccc7222458518d9151b7cc87e39a64b1a96edc25f2827b877f53a0f44fe** is in production-delivery/release-source-scope-inspection.json. Durable explanation: syn-kotlin/verification/swift-exporter-patches/RELEASE_CONTENTS.md.
+
+### Checked Swift representation barrier for the recursive factory
+
+The continuation inspected actual official2.4.20 SirFunction, SirClass and SirCallable member tables: they carry no declaration generic-parameter list. The emitted withRemaining method consequently accepts two unrelated Flags values. A generic Native entry declaration alone cannot establish their shared B equality. Exact pinned StandaloneSirTypeNamer source reconstructs parameterized names from upper-bound classes, and SirRegularInitFromKtSymbol uses that representation for allocation/initialization; this explains the invalid constructor shape in71898 without attributing it to an unverified old source tree.
+
+Actual3613 ran an authored language check with Swift object compilation, mode6/Werror, explicit MacOSX26.5 SDK and ARM64/macOS15 target. Swift rejects a direct Flags<B:Flags<B>> class declaration as self-referential generic requirements; a separate factory-expression diagnostic failure is preserved. Earlier73435 permissionDenied startup and47120 missing-default-SDK failures are harness history, not this type-system result. This was not generated-output editing or product behavior execution.
+
+The current concrete barrier is preservation of the original shared type relation through the public Swift representation and a checked Native witness, including well-typed allocation. Neither literal recursive-superclass emission nor independently erased arguments provides it. No verified compatible protocol/associated-type encoding has been implemented; this does not prove every equivalent encoding impossible. Placeholder bounds, unsafe conversion, hidden APIs or a weaker public contract are not accepted. The five Native failures and original tests remain preserved; this continuation executed zero additional Native bridge builds or product Swift cases. Publication/adoption/external submission remain on hold.
+
+Durable expected-negative source and evidence are in syn-kotlin/verification/swift-exporter-patches/recursive-bounds/relationship-model. Exact checkpoint SHA256 **b2d8933a6848189911b53a0b1f8167e2e61427403ac014ae58d3279a239310d0** is under the matching workspace artifact directory. All commands are terminal; the next implementation must supply that missing typed representation and Native proof before strict Swift behavior acceptance.
+
+
+### Runtime diagnostic behavior: real crash, wrapper ownership defect, five actual passes
+
+The independent RuntimeDiagnostic fixture now tests actual Kotlin/Native objects rather than inferring behavior from successful module compilation. Its first execution60081 starts five Swift cases but aborts before any completes: public KotlinError.init(wrapped: KotlinBase) calls a Native helper that forcibly casts a plain Kotlin object to Throwable. Preserve the raw crash and zero-completed result; XCTest's separate zero-test wrapper summary is not acceptance.
+
+The source correction in syn-kotlin/verification/swift-exporter-patches/ordinary-runtime/KotlinRuntimeSupport.kt.patch uses a checked Throwable conversion and returns the existing absent-message value for other objects. Valid Throwable message semantics and the exported C signature remain unchanged. Component **339db91315cbfc46f0a25539f908de36972872188fcb22131955ee13808f1543** changes exactly that resource atop57182, with6263 file entries and no class/add/remove changes. Actual Native90132 passes. Swift19883 executes five cases: four pass, but immediate wrapper release fails. Adding real Native GC in87391/7146 still yields four passes and one failure. Replacing successful test-framework extraction with a checked guard in62427 also fails the same lifetime assertion; the instrumentation-retention hypothesis is rejected, not presented as a repair.
+
+Exact official2.4.20 source revision **890ac1d94fdb80eb85f0eeb5be5e4352df987b2f** establishes the next boundary. KotlinBase.h Git blob **5ec1617148b9203e94475523336b119c5d79b127** is byte-identical to the consumed Native SDK header, SHA256 **14390b9a40bcd8f924909692249ca95468cd3de36157be762371b1673dab86f3**. ObjCExportClasses.mm blob **48c1ab0a73b873e77860cb998f9f36d56f8d6a07** returns owned alloc/init results from both wrapper factories. Actual Swift6/Werror importer SIL30109 declares both results autoreleased. This is a Native runtime return-ownership mismatch, distinct from String diagnostic storage. The source-header patch declares the actual retained-return convention without changing selectors, parameter/result types or Native binary implementation. It does not hide exported Kotlin APIs or add Kotlin Objective-C decorators.
+
+A separate artifact-local Native SDK copy was checked across **68,681 files**: only konan/swift_export/kotlin_runtime/KotlinBase.h changes, no binaries change and no symlinks exist. Corrected header SHA256 **99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3**; audit SHA256 **fc307f74503549f798b5be8b5d05b1401db69eade9c15a36b7767fc9f35d43c9**. Installed/shared SDK inputs remain unchanged. Native24366 compiles, statically links and embeds successfully. Every generated Native runtime header matches the corrected source input;14 runtime resource copies match the pinned exporter component. Native ARM64 archive SHA256 **d44714fc6d46b1b6ccc469031482f46603d148a0139382b1f136d0652c49af6c**.
+
+Actual Swift7394 exits0. All five named cases pass exactly once with no failures/skips: capturesMessage, snapshotSurvivesMutation, fallbackForMissingMessages, releasesOriginalWrapper and transfersOwnedDiagnostic. They test Unicode/empty messages, mutation-independent snapshots, missing/non-Throwable fallback, real wrapper release after Native collection while retaining the message, and detached-task String transfer. All ten product/test frontend invocations across RuntimeDiagnostic, KotlinRuntimeSupport, KotlinCoroutineSupport, ExportedKotlinPackages and RuntimeSupportContractTests use **Swift6, warnings-as-errors, ARM64/macOS15**. Two Package.swift configuration frontends are separate; their language modes do not establish dependency modes. All63 pinned emitted inputs remain unchanged. The weak-reference test now proves the exercised existential-wrapper lifecycle; it is not a general GC/ARC leak certificate or a class-factory-specific behavior test.
+
+Reproduction inputs live under automation-artifacts/2026-10-20-syn-isolated-library-validation/runtime-wrapper-corrected. Final35-input manifest SHA256 **ecc09a91dfbecbac8234f27ef3cd3382028dd28d61cb90c0431a942c7c63df61** and verified result SHA256 **f09cad94737b93834a83136d901192967464a266fd2539da91ac2e710341b79f** freeze paths, hashes, source blobs, commands and negative histories. Source fixtures and the two additional diffs are durable in syn-kotlin/verification/swift-exporter-patches/ordinary-runtime. Apply diffs to the exact upstream source paths; package only the KotlinRuntimeSupport.kt resource change atop the pinned parent and audit every archive entry. Apply the KotlinBase.h source correction to a separate Native SDK input before generation; never edit emitted files. Preserve all other SDK file hashes. The SDK/header input must be coherent with the exporter resource and Native2.4.20 binaries.
+
+Executed command sequence from the Syn checkout:
+
+```sh
+runtimeArtifacts=../automation-artifacts/2026-10-20-syn-isolated-library-validation/runtime-wrapper-corrected
+ruby "$runtimeArtifacts/run-embed.rb"
+python3 "$runtimeArtifacts/pin-output.py"
+ruby "$runtimeArtifacts/run-contract-tests.rb"
+```
+
+The retained runners use the existing Gradle9.8.0 launcher, offline published dependencies, workers2/in-process Kotlin, artifact-local project/output/Gradle/Konan/SwiftPM/module/temp directories, explicit source-header SDK selection, real Native embed and verbose SwiftPM execution. Invocation files intentionally reject accidental reruns. For a fresh reproduction use a new artifact directory and refreshed complete manifest while retaining the original logs; copy only the hand-authored fixture/runner files and reuse pinned read-only tool inputs. The runtime fixture's collector uses the real kotlin.native.runtime.GC.collect API with its explicit NativeRuntimeApi opt-in. The weak-nil/message assertions remain. [Kotlin's GC/ARC object reclamation rules](https://kotlinlang.org/docs/native-arc-integration.html#object-reclamation) and [Clang's retained-return contract](https://clang.llvm.org/docs/AutomaticReferenceCounting.html#retained-return-values) explain the tested boundaries.
+
+This result expands the delivery closure beyond an exporter-only component. It does not authorize installed compiler/SDK replacement, production adoption, external submission or publication. The intentional removal of mutable KotlinError.wrapped, arbitrary reverse-callback ownership gap and original22 suite remain separate. AWS/OpenTelemetry each require exact-head strict compilation and nonzero actual behavioral tests; these five fixture passes are not their acceptance. Iris's active OpenTelemetry checkout/build ownership remains preserved. Reported SDK/semantic-conventions matrix job labels and the base OpenTelemetry publication predating strict configuration do not establish strict Swift or emulator/QEMU runtime coverage without actual test reports.
+
+### Actual Syn six-case strict validation and KotlinError compatibility reference (3364aa7 — historical checkpoint before 32f6c1ac execution)
+
+> [!NOTE]
+> **Historical checkpoint — item 2 (`dbfc468a` "prepared / unbuilt") was subsequently built and verified at [`db24b93`](#api-preserving-kotlinerror-mixed-mode-validation-exporter-32f6c1ac--header-99186d1d-durable-ref-db24b93) and [`70d733a`](#consolidated-api-preserving-delivery-reference-70d733a--delivery_currentmd-and-procmacro2-mixed-mode-validation-3d8718c):** At commit `3364aa7`, only the API-breaking snapshot candidate (`11da4d91...`) had been executed while the source-compatible `KotlinError.wrapped` resource (`dbfc468a...`) was still prepared/unbuilt. The source-compatible option was subsequently packaged as exporter `32f6c1ac5f137a204bdcaca192b0e59a9999f72d9c549ea0018b6d5fe77b797e` + header `99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3` and passed 6/6 Syn tests, 5/5 Native-backed legacy `KotlinError.wrapped` tests, and 3/3 ProcMacro2 tests under strict mixed-mode `-warnings-as-errors`. Preserve the `11da4d91` negative client proof (`69114`) below as historical API-break evidence.
+
+Syn's compatibility reference is committed and pushed at **3364aa7a3ddb76aea2357f0329c367365bf796b1** in `syn-kotlin` PR #166 (`syn-kotlin/verification/swift-exporter-patches/syn-library/KOTLIN_ERROR_COMPATIBILITY.md`, SHA256 **e6af35e078d3addac6a6fbf94216b6654eb845664833d303b554389749528a78**; `compatibility-evidence.json`, SHA256 **02ea8fd87ed15bb6b01d76d53931f0634979deca4084105bab1d40abccbaf184**). Keep the two candidates strictly distinct:
+
+1. **TESTED six-case snapshot candidate (`deaafb4edd143e82c13346244b35d1e5b4af0e46`):**
+   - Uses Syn source **deaafb4edd143e82c13346244b35d1e5b4af0e46** (durable verification files committed at `1c71b20ecc216ea2e78e40629d310f79a042895d`), coherent exporter SHA256 **11da4d91a1985c1e079e5b363ad33a1404fbd223d702131d19439446c01ba555**, and coherent Native ownership header SHA256 **99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3**.
+   - Native session **38329** and Swift session **42332** both exited 0: all **six unchanged Syn Swift test cases** executed and passed once with zero failures or skips, and all **18 product/test frontend invocations across 9 modules** used **Swift 6, `-warnings-as-errors`, and macOS 15** (`automation-artifacts/2026-10-21-syn-real-swift-deaafb4/optional-set-corrected/verified-result.json`, SHA256 **f6e72bab92c954380c03f1a491e073f29bcdcc4ff6be9934e8e495a1bece1ca9**).
+   - Incremental `SirAsSwiftSourcesPrinter.kt` (combining empty package-level `Sealed` marker conformances onto one extension to fix generated-header ordering) and `TypeBridging.kt` (explicit `Optional.some` wrapping and non-redundant `Set<String>` return) patches preserve named declarations and C headers; no `Array` bridge repair is claimed.
+   - **Public contract break:** This candidate replaces `KotlinError`'s mutable `public var wrapped: KotlinBase` with an immutable `public let message: String` snapshot. Actual old-client negative compilation (session **69114**, `automation-artifacts/2026-10-21-syn-runtime-compatibility/client-result.json`, SHA256 **1674b235aef595556643757a4e7fa0a65e38c99ec9a5c62b81cf9e2a963a4d74**) proves that legacy getter and setter callers fail with `KotlinError has no member wrapped`.
+2. **PREPARED source-compatible original `KotlinError` struct option (`dbfc468a`, unbuilt/unaccepted):**
+   - `automation-artifacts/2026-10-21-syn-runtime-compatibility/source-compatible-preparation/KotlinRuntimeSupport.swift` (SHA256 **dbfc468afd0cbf3325e555ec2ded72f583e1fe4ac3fd690cf831ff8bf3668266**; patch SHA256 **4ce5f4ef806ab54fef3485802f2422f664f0ee5481d22cd817c4221ba3d9826f**) restores the original `KotlinError` struct (`public var wrapped: KotlinBase`, reference identity, mutation, and lazy `description` evaluation) while retaining `internal import` and the redundant-cast fixes alongside the checked Throwable message helper and coherent Native ownership header.
+   - Its intended target configuration is **repaired dependency modules in Swift 5 language mode plus consumer modules in Swift 6 language mode, with `-warnings-as-errors` on BOTH and Native `-Werror`**.
+   - **Not yet built or accepted:** This source-compatible candidate has **not** been compiled, packaged, or tested. Neither of the two consumer language-mode comparison arms (`async-trait-kotlin` `report.json` SHA256 **7902e419248e09a0868e0d989863a508c7d28a713e106a20e183d52aaec41ae3**; `openssl-sys-kotlin` `report.json` SHA256 **2ff2e0380ba11b70839a31ab086537b0a8797970212ebefaf3e66605db135226**) is an accepted strict result because their passing Swift 5 dependency controls disabled dependency `-warnings-as-errors` and suppressed generated Native bridge warnings.
+   - Scanning 9,252 Kotlin/Swift source files across five repositories (`Syn`, `AWS`, `Libc`, `Anyhow`, `ProcMacro2`; `repository-scan.json` SHA256 **3fae889f5124ce0b83017c4f7f4d4eb30d30f47ae7f5a1a31466781b36372ef1**) found zero handwritten `KotlinError` or `.wrapped` uses, which is an inventory observation and **not** a public-client compatibility guarantee.
+3. **Required next validation and ownership boundaries:**
+   - Next validation of the source-compatible producer option requires a coherent repaired producer and real consumer build with `-warnings-as-errors` enabled on both dependency and consumer Swift modules and Native `-Werror` retained, plus behavioral tests for legacy `wrapped` getter/setter, reference identity, lazy `description` evaluation, wrapper lifetime, and unchanged real consumer tests.
+   - Shared producer ownership remains `syn-kotlin`; do not duplicate the unchanged language-mode comparison. The exporter JAR alone cannot deliver the required `KotlinBase.h` Native ownership header.
+   - Do not present an API break or a new compiler product coordinate as the sole or authorized route. Neither the scoped Syn six-case pass nor this prepared source-compatible option establishes `async-trait-kotlin` or `openssl-sys-kotlin` consumer acceptance or clears their Kanban cards.
+
+<a id="api-preserving-kotlinerror-mixed-mode-validation-exporter-32f6c1ac--header-99186d1d-durable-ref-db24b93"></a>
+### API-preserving KotlinError mixed-mode validation (exporter 32f6c1ac + header 99186d1d, durable ref db24b93)
+
+Syn's consolidated compatibility reference is clean and pushed at **db24b934e8db9b0d843a83f3902d9db057e65e67** on `syn-kotlin` PR #166 (`syn-kotlin/verification/swift-exporter-patches/syn-library/KOTLIN_ERROR_COMPATIBILITY.md`, SHA256 **cf633dcb167bca214b2d33e248d6a640a3b60c63cd43a2474b61b1a685627022**; `legacy-api-results.json`, SHA256 **025a82079a034e77eccf73293e8ba2b5f4828527eac47fc277a80cf51bd9b4fa**; retained original receipt `automation-artifacts/2026-10-21-syn-legacy-error-validation/verified-result.json` with identical SHA256 **025a82079a034e77eccf73293e8ba2b5f4828527eac47fc277a80cf51bd9b4fa**; and the five executed fixture bodies in `LegacyErrorTests.swift` committed alongside that reference). All earlier negative language-mode matrices and the snapshot candidate's API-break evidence remain preserved:
+
+1. **Coherent API-preserving producer closure (tested against Syn source `3364aa7a3ddb76aea2357f0329c367365bf796b1`):**
+   - Exporter component SHA256 **32f6c1ac5f137a204bdcaca192b0e59a9999f72d9c549ea0018b6d5fe77b797e**, paired with coherent Native ownership header SHA256 **99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3**, preserves the exact original `KotlinError` `wrapped` struct (`public var wrapped: KotlinBase`).
+2. **Scoped Syn and legacy-client validation:**
+   - Actual Native task **28844** and Syn Swift task **20241** exited **0**: all **six unchanged named Syn cases** (`smokeTest`, `pathRemainsModuleStyleWithLeadingColon`, `tokenTransformPreservesTheTokenStream`, `diagnosticRetainsItsMessageAndIdentity`, `fileResultExposesItsSyntaxTree`, `tokenResultExposesItsTokenStream`) passed once with zero skips.
+   - Raw Syn wrapper exit **1** (`accepted: false`) is retained as a parser-only outcome with independent retained-log classification (`syn/actual-result-classification.json` SHA256 `fbe3755692aedbebe08d8bc43b85a09ee1da89fbd1ea18c1b27d2a90fc15db77`); tests were not rerun to replace that receipt.
+   - Unchanged `wrapped` getter/setter client (`WrappedClient.swift`, task **99880**) compiled with exit **0** (`syn/client-result.json` SHA256 `e4514fa28a6010c0c96d4ade249f97c64d52eff7f049c6372e7823cddd02d68c`).
+3. **Five-case Native-backed legacy `KotlinError` contract suite:**
+   - Separate actual Native task **5575** and Swift task **17955** exited **0**: all **five real Native-backed cases** (`preservesOriginalReference`, `observesMessageMutationLazily`, `replacesWrappedReference`, `copiesKeepTheirOwnMutableSlot`, `retainsUntilErrorIsReleased`) passed once with zero skips.
+4. **Effective language modes and flags (must remain explicitly qualified):**
+   - Generated dependency modules explicitly compile in **Swift 5** language mode; authored consumer modules compile in **Swift 6** language mode.
+   - All observed product and test frontends retain **`-warnings-as-errors`** and target **`arm64-apple-macosx15.0`**, with Native `-Werror` enabled.
+   - The generated SwiftPM `PackageTests` runner target lacks an explicit language-version flag (compiler default with `-warnings-as-errors` retained) and must remain separately qualified rather than claimed as an explicit Swift 6 frontend.
+5. **Scope and non-guarantee boundaries:**
+   - Scope remains **source-compatible mixed-mode validation**. It provides **no** precompiled binary-old-client ABI guarantee, **no** exported `Throwable` subtype/cause/`catch` round-trip guarantee, **no** arbitrary cross-actor safety guarantee, **no** automatic `Array` lowering repair, **no** arbitrary reverse-callback repair, **no** `aws-kotlin` or `libc-kotlin` acceptance, **no** `async-trait-kotlin` or `openssl-sys-kotlin` consumer acceptance, **no** full-KMP gate, and **no** all-module Swift 6 guarantee.
+   - All producer sessions and grants have returned. No production policy change, adoption, Actions dispatch, version bump, merge, publication, or new tooling product is authorized by these results. Do not promote this across the fleet or clear unrelated consumer cards.
+
+<a id="consolidated-api-preserving-delivery-reference-70d733a--delivery_currentmd-and-procmacro2-mixed-mode-validation-3d8718c"></a>
+### Consolidated API-preserving delivery reference (70d733a / DELIVERY_CURRENT.md) and ProcMacro2 mixed-mode validation (3d8718c)
+
+Syn's current delivery reference is clean and pushed at **70d733ae43bfb25c06b74523bc112b52efcc8706** on `syn-kotlin` PR #166 (`syn-kotlin/verification/swift-exporter-patches/syn-library/DELIVERY_CURRENT.md`, SHA256 **92110deb7f5af5a5020afd4e1b9449f2d4e5ba8bbd110ef97048091eee039744**; independent ProcMacro2 downstream review `syn-kotlin/verification/swift-exporter-patches/syn-library/downstream-independent-review.json`). All historical snapshot API-break evidence (`11da4d91a1985c1e079e5b363ad33a1404fbd223d702131d19439446c01ba555` + `client-result.json` `1674b235aef595556643757a4e7fa0a65e38c99ec9a5c62b81cf9e2a963a4d74`) and earlier negative language-mode matrices remain preserved, while `DELIVERY_CURRENT.md` supersedes the old snapshot-break delivery proposal so accepting `KotlinError.wrapped` removal is **not** presented as mandatory:
+
+1. **API-preserving closure across Syn (6 cases + 5 legacy cases) and independent ProcMacro2 (`3d8718c`):**
+   - Using the API-preserving exporter component SHA256 **32f6c1ac5f137a204bdcaca192b0e59a9999f72d9c549ea0018b6d5fe77b797e** plus coherent Native ownership header SHA256 **99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3** (preserving the original `public var wrapped: KotlinBase` property, reference identity, mutable slot copy semantics, and lazy `description` evaluation), ProcMacro2 at clean source **3d8718c2412be6aa99175ab88663edec8dbfa6db** (session **33903**) completed terminally with exit **0** (`automation-artifacts/2026-10-21-proc-macro2-mixed-mode-3d8718c/verified-result.json`, SHA256 **3f6ca3ee7743d7c72fe8dcd59a7a51aa1e7883d9402c6a213c64d917adcc8035**).
+   - Actual Native main compilation, generated Native bridge compilation, ARM64 static linking, and embedding succeeded (`native_exit: 0`, `swift_exit: 0`). All **three unchanged named ProcMacro2 Swift cases** passed once (`tests: 3`, `failures: 0`, `skips: 0`).
+   - The **282-public-record surface guard** and **same-version C-header guard** both passed. The producer `// swift-tools-version: 5.9` manifest was retained with no API-output rewrite, and all **84 source pins**, **16 worker tool JARs**, generated outputs, and archive remained unchanged (`request.json` `18975e479b737a5cd9b60f87f8e6033b13ac7e98f409039a6e5dadd637eea16f`, `result.json` `ab4404bcb3f056812910e8bf3df12d231a781f28af4e2780989ad3974a574788`, `logs/gradle.log` `2924cbb1322230977aafcab5ecd3f87902884da25a47f95a708b70543cdd5c16`, `logs/swift.log` `ebb9532ed0093abebbd2e617c7bd0b8cc2b7d269db76c9f4bfea9c94429f56de`, `generated-inputs.json` `9ab42d8fa7631d200aa4e344da4cfb46ccbff1c28f81fdf6a0032f5c86d68ce5`, `compiler-classpath.json` `5e0c8873e53ff25f25a53018257ed240d9f5efc06800f0954f8a1c12712eb116`, `recipe-pins.json` `8579b7e76091ef4ac07926051018cd1ef3232b702777128f3f70262f097f221b`, `source-pins.json` `812164f95def7f7a88d1bb2f78b39a98580a6699ed5cc8523d78c2dc67111bf7`).
+2. **Independently audited ProcMacro2 frontend flags (16 product/test records total):**
+   - **6 dependency modules** (`KotlinRuntimeSupport`, `ExportedKotlinPackages`, `KotlinCoroutineSupport`, `KotlinStdlib`, `IoGithubKotlinmaniaProcMacroKotlin`, `ProcMacro2`) contribute **12 frontend records** explicitly in **Swift 5** language mode (`-swift-version 5`).
+   - **Authored consumer tests** (`SwiftTestHarnessTests`) contribute **2 frontend records** explicitly in **Swift 6** language mode (`-swift-version 6`).
+   - **Generated `SwiftTestHarnessPackageTests` runner** contributes **2 frontend records** with **no explicit language-mode flag** (`modes: ["None"]`, `generated_runner_explicit_mode: false`) and must remain separately qualified rather than claimed as an explicit Swift 6 frontend.
+   - All **16 product/test records** enforce **`-warnings-as-errors`** and target **`arm64-apple-macosx15.0`** (`werror: true`, `mac15: true`), with 2 `Package.swift` configuration frontends classified separately.
+3. **Production delivery requirements vs diagnostic classpath boundaries (`DELIVERY_CURRENT.md`):**
+   - **Worker tooling vs runtime:** The 16 resolved worker tooling dependencies on `swiftExportClasspath` remain strictly separate from product runtime dependencies (`commonMain` / published KMP coordinates), and artifact-local diagnostic classpaths are not production delivery.
+   - **Minimum closure for any custom KotlinMania-owned tooling route:**
+     1. Complete reproducible source/class/resource patch closure against the exact upstream revision (including the original `KotlinError` API resource and `KotlinBase.h` diff), full signature/instruction/access-flag/facade/archive-delta audits against the unmodified baseline, and **two identical clean-build hashes** reproduced from pinned inputs.
+     2. **Coherent project-local Native SDK/header selection (`kotlin.native.home`):** Because an exporter JAR alone cannot deliver `KotlinBase.h`, any custom delivery requires a verified project-local SDK copy applying only the reviewed `KotlinBase.h` ownership correction while verifying unchanged Native binaries and **never mutating installed/shared SDKs**.
+     3. **Explicit tool-only `swiftExportClasspath` selection** with locked immutable version/checksum, preserving real published KMP product dependencies (no `mavenLocal`, source substitution, JetBrains namespace impersonation, or cache overwrites).
+     4. **Explicit dependency (Swift 5) vs consumer (Swift 6) language-mode configuration** with both Swift `-warnings-as-errors` and Native `-Werror` intact, generated APIs preserved, and the generated `PackageTests` runner qualified separately.
+     5. **Licensing, notices, and Rust-free package contents:** The experimental 6,263-entry archive contains zero Rust/Cargo entries (`RELEASE_CONTENTS.md`), but currently lacks license/notice entries; any redistributable release requires verified upstream/bundled license notices, modified-file attribution, SBOM/provenance, and a fresh audited archive hash after notice additions.
+   - **Exact authorization, deterministic two-build reproducibility, SDK helper verification, Maven Central publications (`io.github.kotlinmania:swift-export-embeddable:2.4.20-km.1`, `io.github.kotlinmania:proc-macro2-kotlin:0.1.7`, `io.github.kotlinmania:syn-kotlin:0.4.0`) & legitimate-dependency-edge downstream adoption (`KotlinMania/kotlin-swift-export-tooling`, 2026-10-21):**
+     - **Published release, green CI runs & immutable handoff receipt (`published-handoff-2.4.20-km.1.json`):**
+       - Repository: [`https://github.com/KotlinMania/kotlin-swift-export-tooling`](https://github.com/KotlinMania/kotlin-swift-export-tooling), source/tag **`3687a03e783c3f7215c431dc4600314a64678761`**, release [`https://github.com/KotlinMania/kotlin-swift-export-tooling/releases/tag/v2.4.20-km.1`](https://github.com/KotlinMania/kotlin-swift-export-tooling/releases/tag/v2.4.20-km.1).
+       - Green CI runs: PR CI [`39590144174`](https://github.com/KotlinMania/kotlin-swift-export-tooling/actions/runs/39590144174), exact-`main` CI [`39591983416`](https://github.com/KotlinMania/kotlin-swift-export-tooling/actions/runs/39591983416) (`main_native_swift_receipt_sha256`: **`6f97378c016801c1c2da0116750c81a78c2a4353c346bc76ee9299c3b034a1fd`**), and release/Maven Central retrieval CI [`39594386832`](https://github.com/KotlinMania/kotlin-swift-export-tooling/actions/runs/39594386832) (`retrieval_receipt_sha256`: **`ee3ed221eecccd1bd2dd78ece8470eefa163bc07e2d2318079502fb12cac37b1`**, `resolved_worker_receipt_sha256`: **`b17aa63531ff3430e296a335b4b92b6c92b55d93d63068a913270cc9f98176a5`**, signing public key fingerprint: **`1B07CFB6CD172EF8B1E078A7BC3EFBDB5650D775`**).
+       - Immutable handoff receipt: [`automation-artifacts/2026-10-21-swift-tooling-release/published-handoff-2.4.20-km.1.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-swift-tooling-release/published-handoff-2.4.20-km.1.json) (`SHA256: 1a4499a7b5c2d57517c565c486bdd184b784d526b7c64aace7be8143ad23d363`).
+       - All **6 published & independently retrieved Maven Central files** at `https://repo.maven.apache.org/maven2/io/github/kotlinmania/swift-export-embeddable/2.4.20-km.1/`:
+         - `swift-export-embeddable-2.4.20-km.1.jar`: **`e1b871c93dd9556fb7235cd05f70b3c2bc7d32f2cb1b69f1d9161918fd088f3a`** (identical across clean builds `rebuild-d` and `rebuild-e`; kept strictly distinct from earlier patched-JAR diagnostic component `32f6c1ac5f137a204bdcaca192b0e59a9999f72d9c549ea0018b6d5fe77b797e`)
+         - `swift-export-embeddable-2.4.20-km.1.pom`: **`a149229ad82bb239bbe39419948d43b9ab37cb9f6f7e0f9117c762504e841bf8`** (resolving all **16 worker components** in `b17aa635...` **without** a duplicate official `org.jetbrains.kotlin:swift-export-embeddable`)
+         - `swift-export-embeddable-2.4.20-km.1-sources.jar`: **`201b896f4aa305840dbe82196af4d6d85edd84cd04c3303e3da24c2ff0efc714`**
+         - `swift-export-embeddable-2.4.20-km.1-javadoc.jar`: **`e9f4031419d4223ab17106996f2f57f728cda652fe2a16c2af89b634d7d0569e`**
+         - `swift-export-embeddable-2.4.20-km.1-sbom.json`: **`a39d1122bcb85b4ed496a93b3b6c021bf885e52800d01a3a56e3d78c22318f80`**
+         - `swift-export-embeddable-2.4.20-km.1-native-sdk-helper.zip`: **`791b07cdd195008ad46f182693e3316747530fcb0b765478cb0201ac23cb2fb2`** (packaging `scripts/prepare_native_sdk.py` `c5a6f22b55cebaa21eef856cded66210b1dde4bc98ccb69046a2d498c6df1775` and `patches/KotlinBase.h.patch` `86295c6ad02441d080f8136dc4f5cb8dd0ed33f66aeff9caf271aa2d51f291fe`)
+     - **Project-local Native SDK helper proofs & required `-Xauto-cache-dir=<owned build output>` (preserved separately):**
+       1. **Earlier `9,719`-file project-local SDK helper validation (used by `ProcMacro2` session `26558`):** Real execution produced `/Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-swift-tooling-release/sdk-helper-validation/native-sdk` across **`9,719` files**, modifying **only** `konan/swift_export/kotlin_runtime/KotlinBase.h` to `99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3` while leaving all Native binaries and the installed source SDK untouched (`installed_source_modified: false`). Receipt: [`automation-artifacts/2026-10-21-swift-tooling-release/sdk-helper-validation/receipt.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-swift-tooling-release/sdk-helper-validation/receipt.json) (`SHA256: e9caac5c120f889268fc4c9ea216cdb5bfdac5cf7e5c0610ca5688abf27d259c`). **Provenance qualification:** In this earlier run, the helper script source hash (`/Volumes/stuff/Projects/kotlinmania/kotlin-swift-export-tooling/scripts/prepare_native_sdk.py`, `SHA256: c5a6f22b55cebaa21eef856cded66210b1dde4bc98ccb69046a2d498c6df1775`) was **observed AFTER execution**, not frozen beforehand, whereas the SDK creation receipt (`e9caac5c...`) was frozen prior to consumer execution.
+       2. **Pre-publication `40,932`-file packaged-helper validation with pre-execution frozen hashes:** Candidate helper ZIP (`distribution-a/swift-export-embeddable-2.4.20-km.1-native-sdk-helper.zip`, `SHA256: e7628656305829d8664329cdb95f8167b667b6c997a91eac51b16add597d8237`) was extracted and its helper/source/patch hashes (`prepare_native_sdk.py` `c5a6f22b55cebaa21eef856cded66210b1dde4bc98ccb69046a2d498c6df1775`, `inputs.lock.json` `6d24fd4210e2e835c78f189e2191bbdf3309f4b6d432abaa8d860a9134923ea9`, `KotlinBase.h.patch` `86295c6ad02441d080f8136dc4f5cb8dd0ed33f66aeff9caf271aa2d51f291fe`) were **frozen BEFORE execution** in [`automation-artifacts/2026-10-21-swift-tooling-release/packaged-helper-validation/frozen-before-execution.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-swift-tooling-release/packaged-helper-validation/frozen-before-execution.json) (`SHA256: c702f7c499cd86a95dbaaec422e5156116768955839431ccf80d4636b23a4ffa`). Executed against the official Maven SDK archive (`SHA256: b70d4fd2855fdb054fc9604beaa7de83c18d786454ae948de72a226e81f07dc8`, **`40,932` input files**, `unchanged_file_count: 40931`), **only** `konan/swift_export/kotlin_runtime/KotlinBase.h` changed to `99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3`, with `unchanged_native_binaries: true` and `installed_source_modified: false` ([`automation-artifacts/2026-10-21-swift-tooling-release/packaged-helper-validation/sdk-audit.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-swift-tooling-release/packaged-helper-validation/sdk-audit.json), `SHA256: 9efd1fd9d66e226bdf5fd129310ca0da2be1a1e46c140515be832165a0252f4e`).
+       3. **Published helper ZIP (`791b07cd...`) & exact-`main` CI acceptance (`6f97378c...`) with `KotlinNativeLink` `-Xauto-cache-dir`:** During SDK preparation against the `40,932`-file official SDK (`b70d4fd2...`), the helper modifies **one** original SDK file (`KotlinBase.h` `14390b9a...` $\to$ `99186d1d...`), leaving **`40,931` files unchanged**. In exact-`main` CI run [`39591983416`](https://github.com/KotlinMania/kotlin-swift-export-tooling/actions/runs/39591983416) (`6f97378c016801c1c2da0116750c81a78c2a4353c346bc76ee9299c3b034a1fd`), configuring `tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink>().configureEach { val cache = layout.buildDirectory.dir("native-auto-cache/$name"); toolOptions.freeCompilerArgs.add(cache.map { "-Xauto-cache-dir=${it.asFile.absolutePath}" }) }` ([`kotlin-swift-export-tooling/README.md:45-58`](file:///Volumes/stuff/Projects/kotlinmania/kotlin-swift-export-tooling/README.md#L45-L58)) ensured that cold dependency auto-cache generation during linking never wrote into `$PREPARED_NATIVE_SDK/klib/cache`; **after preparation**, all **`40,932` prepared SDK input files** remained unchanged across the complete Native build/link/embed and `3/3` unchanged `ProcMacro2` Swift test execution (`12` dependency-mode-5 + `2` authored-mode-6 + `2` generated-runner-no-explicit-mode frontend records, all with `-warnings-as-errors` and `arm64-apple-macosx15.0`).
+     - **Independent `ProcMacro2` pre-publication release-candidate validation (`session 26558`, clean `3d8718c2412be6aa99175ab88663edec8dbfa6db`):** Using release candidate `e1b871c9...` + the `9,719`-file helper SDK (kept strictly distinct from earlier diagnostic session `33903` using `32f6c1ac...`), Native main/bridge/static ARM64 link/embed and `swift test` exited `0` (`native_and_swift_exit: [0, 0]`) and all **3 unchanged named Swift cases** (`tokenStreamParsingAndFormatting`, `tokenStreamParseFailure`, `literalAndPunctExport`) executed and passed once (`failures: 0`, `skips: 0`). Across **16 actual product/test frontends** (`configuration_frontends: 2` separate), `12` dependency records across 6 modules compiled in explicit **Swift 5**, `2` authored `SwiftTestHarnessTests` records compiled in explicit **Swift 6**, and `2` generated `SwiftTestHarnessPackageTests` runner records compiled without an explicit mode flag (`modes: ["None"]`, `generated_runner_explicit_mode: false`), with **all 16 enforcing `-warnings-as-errors` and `arm64-apple-macosx15.0`** and Native `-Werror` retained. All `282` public declaration records and same-version C-header guards passed (`// swift-tools-version: 5.9` retained). Receipt: [`automation-artifacts/2026-10-21-proc-macro2-release-e1b871c/verified-result.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-release-e1b871c/verified-result.json) (`SHA256: d3efd67db7e934bc08c3009f21e28028d066c9ec3726d2b8e7982eafa2e3577e`; pinning `request.json` `b694d60bd5d1fae2b5541de6baf92980382ee9e37582ac0641d35db3e255423f`, `result.json` `3b1a9a1c31b9c508fc5dae56d0c5db778b9ead1db04b861d1d900caee8efe208`, `source-pins.json` `812164f95def7f7a88d1bb2f78b39a98580a6699ed5cc8523d78c2dc67111bf7`, `producer-inputs.json` `b83f1754f84e7520df4369195379db1feeebdd21b41691d0f0d1a02a23b9c0bf`, `sdk-pins.json` `5e08bc52d5dda2a80b8351a1281708a77ad6a48a2165f4beb0bd79fc8e5c98fd`, `compiler-classpath.json` `69014c298668d54c47cefc866c7d5ab9325b07a6384ecef82f3b862b6fc0b420`, `recipe-pins.json` `8eeb456a9ab277f786fd02714d649cb44b58e08ec76628929746538ba6e6c783`, `generated-inputs.json` `4a84db0df722397b850979351de62ccef10006cab5ff93934a72a506ca57a709`, `logs/gradle.log` `d22699d197d0b5b7bc239f589583068b1800facf4f91434422c920ef71c1dd16`, `logs/swift.log` `3c3eeee3a8d4041ab51daf0a4c12e00b76535db1510b9bd4efc0a4f5ead88bbf`); Syn independent review SHA256: **`73f7786053078f88de249ca517850768a4b4c5dbbcec02fb8cea1742094c38ac`**.
+     - **Published `io.github.kotlinmania:proc-macro2-kotlin:0.1.7` (`80e3e1a7...`) & `io.github.kotlinmania:syn-kotlin:0.4.0` (`94d99bde...`) releases and legitimate-dependency-edge downstream adoption:**
+       1. **Published `proc-macro2-kotlin:0.1.7` ([`verified-handoff.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/verified-handoff.json) `SHA256: 8bd790091d5497cbfefef868cda860a7ceacb6c89ca85fe73606a951d6414519`):** Tag/source [`80e3e1a7ce0106f2eca66b4e3893c6dc07e16c4c`](https://github.com/KotlinMania/proc-macro2-kotlin/releases/tag/v0.1.7) ([PR #103](https://github.com/KotlinMania/proc-macro2-kotlin/pull/103), PR CI [`39601562312`](https://github.com/KotlinMania/proc-macro2-kotlin/actions/runs/39601562312) green, exact-`main` CI [`39602916681`](https://github.com/KotlinMania/proc-macro2-kotlin/actions/runs/39602916681) `12/12` green with `793` KMP + `3` Swift executions, publication CI [`39604506913`](https://github.com/KotlinMania/proc-macro2-kotlin/actions/runs/39604506913) where accepted Central deployment `920dae47-341f-4722-a294-479a89459a8f` timed out only during status polling after `PUBLISHING` `120/120` with no repeat upload, qualified in [`publication-timeout.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/publication-timeout.json) `6caea44c97449270d195a2413aa2d3ce99b3cd41ff143cc7d3cceecbc80ece20`; [`published-metadata.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/published-metadata.json) `42d74e06d8f2fa98d86fcfa5e9e5568b2d0a205b137de19d56b4af1cfa8c1a36`, [`signature-verification.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/signature-verification.json) `c024d08409c9a1075a729ef2fe88d8d737a3902ad331ea85f2ebd7fae1c95169`, [`explicit-return.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/explicit-return.json) `30997757299ef5dcbd23ed6dcfc322d7f80923d1bde7bcff6a4516da4b5b2c95`; `proc-macro2-kotlin-0.1.7.module` `f519acc1fb3b7628aad84581b07ad0a409f9cf0d083140b8db2a32a84b2749f5`, `.pom` `bc8a9215b2c280589280964c43da47d8f6b1eec4cbb0bdebcb1c4641f57745c7`, `-android-0.1.7.module` `cdc93d2355fd44c07d75af057726b66ffbb69f025f7779f1323be99fe59c59fc`, `-android-0.1.7.pom` `575e873725864553f3e501274b7f7ed6c3e8d4c0b5bc85f4fd002758d8d8a2bd`, `-android-0.1.7.aar` `cfad6973e50765bb8d15a249c8c5e3023eb8e9b41447b5664e26e0b48445bd33`), selecting published `io.github.kotlinmania:proc-macro-kotlin:0.1.4` (`proc-macro-kotlin-0.1.4.module` `c19a2c9fd36a19518dd360bfc21f89b6a8dc99818f4b227be964bfe382da9223`, `-android-0.1.4.module` `e46d349c80725f08bd82ba82bd9d48d75514add36433c237ff4802904a08dbbe`, `-android-0.1.4.aar` `864cbedbafdf952aac7737d843468f18771863cd6efc73d6f6ef7d8977a3933d`, `classes.jar` `0aa3fa7422cbe9f17640be4f0ff1c77b770228dc2099fa66c9c6b0a6db02d403` relocating bundled `ApiStatus` classes under `io/github/kotlinmania/procmacro/vendored`) and passing **3/3 unchanged Swift cases** (`tokenStreamParsingAndFormatting`, `tokenStreamParseFailure`, `literalAndPunctExport`, `0` failures/skips) under dependency mode `5` (`-warnings-as-errors`), authored consumer mode `6` (`-warnings-as-errors`), and Native bridge `-Werror` (with the generated `PackageTests` runner separately qualified) plus **2/2 independent public Central consumer cases** (`parseFailureRetainsDiagnostic`, `tokenValuesSurvivePublishedBoundary`, `0` failures/skips, `gradle_exit: 0`, `consumer_resolution_sha256: 4bcef15cda4061986861905ea181dea76f5ab1e039bcb7870a0ce108e372ea5e`, [`consumer-v2-command.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/consumer-v2-command.json) `72489226583e2a0245a9c5f880d57611fe716085ffb7101e195fe6c68c6d244c`, [`consumer-v2-exit.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-proc-macro2-central-0.1.7/consumer-v2-exit.json) `e89df0eae5ec7db81135aed16463968955c578bcc4f2ec43172eff351f080c17`, with explicit existing JDK 21 qualified after fresh-home preflight only discovered JDK 25).
+       2. **Published `syn-kotlin:0.4.0` (`verified-handoff.json` `SHA256: 450bb79064b17a7d5831f9c4ca241323df5db516c0573dc71301a21d1accd0f8`):** Tag/source [`94d99bde9aa9c785fb190f2f87e0b7f6b53693a6`](https://github.com/KotlinMania/syn-kotlin/releases/tag/v0.4.0) ([PR #166](https://github.com/KotlinMania/syn-kotlin/pull/166)), green PR final CI [`39611272033`](https://github.com/KotlinMania/syn-kotlin/actions/runs/39611272033) (`12/12`), green exact-`main` CI [`39616216695`](https://github.com/KotlinMania/syn-kotlin/actions/runs/39616216695) (`12/12`), and green release publication CI [`39620970747`](https://github.com/KotlinMania/syn-kotlin/actions/runs/39620970747) (Central deployment `e03f7c1e-93b3-4ace-a4d7-e8a5074e65e5`, `18` published components, `79` retrieved signed files under key `1B07CFB6CD172EF8B1E078A7BC3EFBDB5650D775`, `43` archives with zero frozen Rust/tmp sources, public `syn-kotlin-android-0.4.0.aar` `3aaabe825d1765c3d7431bb62519eeae524ac6aca8972b8941cb162f43d431b0`; [`verified-handoff.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-syn-release-preparation/proc-macro2-017/publication-v0.4.0/verified-handoff.json) pinning `retrieved-artifacts.json` `cefbcb2146ac98bc4b7c08d29e4a3c4491f31e73e9529dfaa993c2cc0bfa6cfa`, `signature-verification.json` `30b0b6dc42ef4f560d910334b5418000c0fd75dbce3f211d1623c08e8b3776db`, `public-metadata.json` `532ff294f8818d1156a97b5f618b5576ada2a2be8886e7067817887f3afee785`, `verified-public-consumer.json` `188a82aaea123975567d7102d93329fc689e9ae9be439f6e852c8ffd0d4fb548`, `repository-index.json` `2f3762ed8f293fc91a227379ed6388931cb08707fbce1521c1f24b35ec09a4d4`, and `workflow-raw.log` `2df90e563dc33654f80ec01d2f3c6e3418e376bd6339138cbb4fc18a7b1d9ca8`). Passed **6/6 unchanged Swift cases** (`0` failures/skips, `40,932` prepared SDK files unchanged) plus **3/3 fresh-cache public `AndroidHost` JVM consumer cases** (`parsedFileCrossesPublicationBoundary`, `typedTokenAdapterCrossesPublicationBoundary`, `diagnosticTokensCrossPublicationBoundary`, `0` failures/skips, `exit 0`, resolving `proc-macro2-kotlin:0.1.7` $\to$ `proc-macro-kotlin:0.1.4` from public Central and compiling against the Android API — scoped as an `AndroidHost` JVM + Android API compilation/execution proof, not device/emulator). *(Later `README.md`-only `main` commit `8c9147ea8f2c45de36de890ccf1a6a8de815a3d8` via [PR #167](https://github.com/KotlinMania/syn-kotlin/pull/167) leaves tag `94d99bde...` and compiler inputs unchanged; do not attribute the earlier release CI runs to that prose-only commit.)*
+       3. **Legitimate-dependency-edge & per-project acceptance rules:** Downstream repositories may adopt `2.4.20-km.1`, `proc-macro2-kotlin:0.1.7`, and `syn-kotlin:0.4.0` **only where they are legitimate project dependency or tool edges** (never `mavenLocal`, never source substitution, and never inventing a direct source dependency to force a transitive version), and each project owner must still run its own unchanged behavioral tests under dependency mode `5` (`-warnings-as-errors`), authored consumer mode `6` (`-warnings-as-errors`), and Native bridge `-Werror` (with the generated `PackageTests` runner separately qualified) before removing temporary warning/API workarounds.
+     - Scope of the validated mixed-mode proof (`32f6c1ac...` & `e1b871c9...` + `99186d1d...`) does **not** extend to all-module Swift 6 dependency compilation, `Array` lowering, arbitrary reverse-call ownership, `aws-kotlin`, `libc-kotlin`, `async-trait-kotlin`, `openssl-sys-kotlin`, or full-KMP acceptance. All resources and sessions have returned; no new CI dispatch, consumer edit, or build is authorized by this reference.
+4. **Complete downstream handoff receipt (`downstream-handoff.json` SHA256 `234f455a6571f5bf1222697fd66c2253a9a18f6c00e96f41e51ba7717a8a64fe`):**
+   - Path: `automation-artifacts/2026-10-21-syn-legacy-error-validation/downstream-handoff.json`.
+   - **Producer component:** `automation-artifacts/2026-10-21-syn-legacy-error-validation/legacy-api-swift-export-embeddable-2.4.20.jar` (`SHA256: 32f6c1ac5f137a204bdcaca192b0e59a9999f72d9c549ea0018b6d5fe77b797e`).
+   - **Separate project-local Native SDK input:** `automation-artifacts/2026-10-20-syn-isolated-library-validation/runtime-wrapper-corrected/native-sdk` (selected via public Gradle property `-Pkotlin.native.home=<prepared-sdk-copy>`, containing `konan/swift_export/kotlin_runtime/KotlinBase.h` `SHA256: 99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3` with zero Native binary changes and zero shared/installed SDK writes).
+   - **Generated dependency manifest (`syn/build/SPMPackage/macosArm64/Debug/Package.swift`):** `SHA256: 072318fc3251ab8299eab9dd923c39771b23f4fe927bbb4b5b89364045a8ab7c` (`producer_tools_version: "5.9"`, `post_generation_source_rewrite: false`).
+   - **Pinned runner & verification files in `downstream-handoff.json`:**
+     - `syn/strict.xcconfig`: `410b1cfdb8edef8050c57818df28602309bff50634876c7c20713a4fddabb6ab` (`SWIFT_VERSION = 5`, `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`, `GCC_TREAT_WARNINGS_AS_ERRORS = YES`)
+     - `syn/isolation.init.gradle`: `e92d9e1a9f6a4798346cbb5a4fe2c665feccc36cdb7a4007010e10f40b9dc889` *(Diagnostic-only init script: its `task.actions = actions.take(1)` on `*GenerateSPMPackage` prevents legacy repository post-actions from rewriting generated sources/manifests during isolated diagnostics and is **NOT** a supported production recipe.)*
+     - `syn/run-native.rb`: `7b775b624e937f151146698ab54cf416225bd5005cd26c2fc419ae06eac75d47`
+     - `syn/run-swift.rb`: `8df4fb587d3f59b4a68cc72a09fe23bfd44bdf8c4acab8e083b11e45daa7737a`
+     - `syn/actual-result-classification.json`: `fbe3755692aedbebe08d8bc43b85a09ee1da89fbd1ea18c1b27d2a90fc15db77`
+     - `package-audit.json`: `456f9d7f929c1bd3beb45357bd3fbfb5a2287751de06145337a722dd6d949159`
+     - `verified-result.json`: `025a82079a034e77eccf73293e8ba2b5f4828527eac47fc277a80cf51bd9b4fa`
+   - **Resolved 16-JAR worker classpath (`swiftExportClasspath`, never `commonMain`):**
+
+     | # | Worker Classpath Artifact (`tool-dependencies/` + producer component) | SHA256 |
+     | :-: | :--- | :--- |
+     | 1 | `annotations-23.0.0.jar` | `7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05` |
+     | 2 | `caffeine-2.9.3.jar` | `1e0a7bbef1dd791653143f3f05d0e489934bf5481e58a87c9e619cd46b68729b` |
+     | 3 | `checker-qual-3.43.0.jar` | `3fbc2e98f05854c3df16df9abaa955b91b15b3ecac33623208ed6424640ef0f6` |
+     | 4 | `error_prone_annotations-2.28.0.jar` | `f3fc8a3a0a4020706a373b00e7f57c2512dd26d1f83d28c7d38768f8682b231e` |
+     | 5 | `kotlin-build-tools-api-2.4.20.jar` | `47a622dce7231b1916334b69a00bc1094adf6577e6492f9f06b3d9c2450fe459` |
+     | 6 | `kotlin-compiler-embeddable-2.4.20.jar` | `cf97161430683fb9af96dc6a7017ffae1fe8737b80d12eee11f2fe3e76f8ded8` |
+     | 7 | `kotlin-daemon-embeddable-2.4.20.jar` | `eef72cf8f17e6d98d33e5b7c7e1cab31a1cf5fc34084dd5e563e7b1f3ef53435` |
+     | 8 | `kotlin-reflect-1.6.10.jar` | `3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203` |
+     | 9 | `kotlin-script-runtime-2.4.20.jar` | `fc5a19df78be445d84e8352e0d01098a6a8181324aa50c6f7bf850338e81e1b4` |
+     | 10 | `kotlin-stdlib-2.4.20.jar` | `2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f` |
+     | 11 | `kotlinx-coroutines-core-jvm-1.10.2-intellij-1.jar` | `1e9b4b60644ca8dd5e9687ad096aee0028bd9d3a24afed3e38565b22ca726ee0` |
+     | 12 | `kotlinx-coroutines-core-jvm-1.8.0.jar` | `9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5` |
+     | 13 | `kotlinx-serialization-core-jvm-1.7.3.jar` | `f0adde45864144475385cf4aa7e0b7feb27f61fcf9472665ed98cc971b06b1eb` |
+     | 14 | `opentelemetry-api-1.41.0.jar` | `9336668f388de68a0a2c3e114154febd29db19a7644f27c4eba548f5de852258` |
+     | 15 | `opentelemetry-context-1.41.0.jar` | `5e3432a4464a432abfdab73be7142e516d25a84aa8426fce1192ffb0532faa35` |
+     | 16 | `legacy-api-swift-export-embeddable-2.4.20.jar` | `32f6c1ac5f137a204bdcaca192b0e59a9999f72d9c549ea0018b6d5fe77b797e` |
+
+   - **Closed historical diagnostic record (`run-native.rb` + `run-swift.rb` with `-I isolation.init.gradle` — do NOT rerun or borrow scratch caches):**
+     - **Historical-only boundary & non-rerun guards:** The retained directory `automation-artifacts/2026-10-21-syn-legacy-error-validation/syn` has **returned its execution grant** (`execution-grant.json` `active: false`) and `run-native.rb` / `run-swift.rb` enforce one-shot guards that abort (`Existing Native invocation` / `Existing invocation`) because `native-invocation.json` and `swift-invocation.json` already exist. **Do NOT rerun returned grants, do NOT overwrite retained artifact directories, and do NOT borrow historical shared scratch caches** (`2026-10-21-syn-real-swift-deaafb4/gradle-home`, `konan-data`, or `2026-10-20-syn-isolated-library-validation/.../native-sdk`) for new builds. During that closed diagnostic, `-I "$ART_ROOT/isolation.init.gradle"` (`run-native.rb:23`) redirected `layout.buildDirectory` to `$ART_ROOT/build`, selected the 16-JAR worker classpath containing the historical patched-JAR proof `32f6c1ac...` (distinct from the published `2.4.20-km.1` clean-build release `e1b871c9...` in `KotlinMania/kotlin-swift-export-tooling`), and stripped legacy repository `GenerateSPMPackage` post-actions (`task.actions = actions.take(1)` — **diagnostic only; never copy task-action stripping into production**). For the supported published-input production recipe (which requires the prepared SDK/helper receipt, `-Xauto-cache-dir=<owned build output>`, immutable published `2.4.20-km.1` worker closure, fresh empty evidence/scratch/build output, nonzero `KotlinBase.h` verification, and legitimate project dependency edges), see [`template/V2_SWIFT.md` §7](file:///Volumes/stuff/Projects/kotlinmania/template/V2_SWIFT.md#clean-generation-and-consumer-recipes).
+     ```bash
+     #!/usr/bin/env bash
+     set -euo pipefail
+
+     # HISTORICAL RECORD ONLY (tasks 28844 / 20241 in 2026-10-21-syn-legacy-error-validation/syn).
+     # Execution grant is returned ("active": false) and native-invocation.json / swift-invocation.json
+     # are sealed. Do NOT rerun this closed grant or reuse its historical scratch caches.
+     ART_ROOT="/Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-syn-legacy-error-validation/syn"
+     REPO="/Volumes/stuff/Projects/kotlinmania/syn-kotlin"
+     PREPARED_NATIVE_SDK_PATH="/Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-20-syn-isolated-library-validation/runtime-wrapper-corrected/native-sdk"
+     GRADLE_HOME_ISOLATED="/Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-syn-real-swift-deaafb4/gradle-home"
+     KONAN_DATA_ISOLATED="/Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-syn-real-swift-deaafb4/konan-data"
+
+     if [ -e "$ART_ROOT/native-invocation.json" ] || [ -e "$ART_ROOT/swift-invocation.json" ]; then
+       echo "Historical diagnostic grant is closed and sealed; refusing to rerun." >&2
+       exit 1
+     fi
+
+     # 1. Dependency xcconfig: Swift 5 language mode with Swift & Clang warnings-as-errors
+     cat > "$ART_ROOT/strict.xcconfig" <<'EOF'
+     SWIFT_VERSION = 5
+     SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+     GCC_TREAT_WARNINGS_AS_ERRORS = YES
+     EOF
+
+     # 2. Native KLIB, SwiftExport generation, Kotlin bridge compile (-Werror), static link & SPM build
+     # Note: -I "$ART_ROOT/isolation.init.gradle" (run-native.rb:23) redirected build/ -> $ART_ROOT/build
+     # and selected the 16-JAR worker classpath with 32f6c1ac...
+     (
+       cd "$REPO"
+       KOTLINMANIA_SYN_REPAIR_ROOT="$ART_ROOT" \
+       KOTLINMANIA_RUNTIME_CONTRACT="$ART_ROOT" \
+       GRADLE_USER_HOME="$GRADLE_HOME_ISOLATED" \
+       KONAN_DATA_DIR="$KONAN_DATA_ISOLATED" \
+       TMPDIR="$ART_ROOT/tmp/" \
+       JAVA_TOOL_OPTIONS="-Djava.io.tmpdir=$ART_ROOT/tmp -Duser.home=$ART_ROOT/process-home -Didea.system.path=$ART_ROOT/idea-system -Didea.config.path=$ART_ROOT/idea-config" \
+       CLANG_MODULE_CACHE_PATH="$ART_ROOT/clang-cache" \
+       SWIFT_MODULECACHE_PATH="$ART_ROOT/module-cache" \
+       SWIFTPM_MODULECACHE_OVERRIDE="$ART_ROOT/module-cache" \
+       BUILT_PRODUCTS_DIR="$ART_ROOT/build/swift-test" \
+       TARGET_BUILD_DIR="$ART_ROOT/build/swift-test" \
+       SDK_NAME="macosx" CONFIGURATION="Debug" ARCHS="arm64" \
+       FRAMEWORKS_FOLDER_PATH="Frameworks" \
+       MACOSX_DEPLOYMENT_TARGET="15.0" \
+       DEPLOYMENT_TARGET_SETTING_NAME="MACOSX_DEPLOYMENT_TARGET" \
+       XCODE_XCCONFIG_FILE="$ART_ROOT/strict.xcconfig" \
+       CI="true" \
+       ./gradlew embedSwiftExportForXcode \
+         --offline --no-daemon --max-workers=2 \
+         --no-configuration-cache --no-build-cache --console=plain \
+         --project-cache-dir "$ART_ROOT/project-cache" \
+         -I "$ART_ROOT/isolation.init.gradle" \
+         -Pkotlin.native.home="$PREPARED_NATIVE_SDK_PATH" \
+         -Pkotlin.project.persistent.dir="$ART_ROOT/kotlin-project" \
+         -Pkotlin.compiler.execution.strategy=in-process \
+         "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Djava.io.tmpdir=$ART_ROOT/tmp" \
+         2>&1 | tee "$ART_ROOT/native.log"
+     )
+
+     # 3. Verify nonzero emitted KotlinBase.h headers (>= 2) and exact SHA256 on every file
+     HEADER_COUNT="$(find "$ART_ROOT/build" -type f -name 'KotlinBase.h' | wc -l | tr -d ' ')"
+     test "$HEADER_COUNT" -ge 2
+     find "$ART_ROOT/build" -type f -name 'KotlinBase.h' -exec shasum -a 256 {} + | tee "$ART_ROOT/header-hashes.txt"
+     awk 'END { if (NR < 2) exit 1 } $1 != "99186d1dd029a8ba5b66dae390a3aec0d6d0e5293eff641d85daab5e212723c3" { exit 1 }' "$ART_ROOT/header-hashes.txt"
+
+     # 4. Real Swift 6 consumer test execution with warnings-as-errors and macOS 15.0 target
+     (
+       cd "$REPO/src/swift/swift-test-harness"
+       KOTLINMANIA_SWIFT_EXPORT_BUILD="$ART_ROOT/build" \
+       TMPDIR="$ART_ROOT/tmp/" \
+       CLANG_MODULE_CACHE_PATH="$ART_ROOT/clang-cache" \
+       SWIFT_MODULECACHE_PATH="$ART_ROOT/module-cache" \
+       SWIFTPM_MODULECACHE_OVERRIDE="$ART_ROOT/module-cache" \
+       /usr/bin/xcrun swift test -v \
+         --package-path "$REPO/src/swift/swift-test-harness" \
+         --scratch-path "$ART_ROOT/swift-test-build" \
+         --cache-path "$ART_ROOT/swiftpm/cache" \
+         --config-path "$ART_ROOT/swiftpm/config" \
+         --security-path "$ART_ROOT/swiftpm/security" \
+         --jobs 2 \
+         -Xswiftc -warnings-as-errors \
+         -Xswiftc -target -Xswiftc arm64-apple-macosx15.0 \
+         2>&1 | tee "$ART_ROOT/swift.log"
+     )
+
+     # 5. Record raw log manifest
+     shasum -a 256 "$ART_ROOT/strict.xcconfig" "$ART_ROOT/header-hashes.txt" "$ART_ROOT/native.log" "$ART_ROOT/swift.log" > "$ART_ROOT/raw-log-manifest.sha256"
+     ```
+5. **Independently verified `v8-kotlin` PR #121 / PR #122 (`main` @ `4be04116172bd955580511da3ab264eb69797c00`) project-specific workarounds and non-`-Werror` qualification (Antigravity session `035cfd35-895c-497a-927a-3af4da50a6b1`, canonical write yield confirmed):**
+   - **Repository & commits:** [`https://github.com/KotlinMania/v8-kotlin`](https://github.com/KotlinMania/v8-kotlin), source commit `4be04116172bd955580511da3ab264eb69797c00` ([PR #121](https://github.com/KotlinMania/v8-kotlin/pull/121), merged from `da6fa39` / `7997b92`), followed by merged doc-sync [PR #122](https://github.com/KotlinMania/v8-kotlin/pull/122) (mirroring template commit `51d31a8`, [### 15.](#15-backticked-kotlin-reserved-keywords-on-public-declarations-emit-unbackticked-calls-in-the-swift-export-kotlin-bridge) and [### 16.](#16-public-mutablemap--mutableset--mutablelist-properties-trigger-global-ktypewkotlincollectionsmutableset-already-exists-during-static-linking) above).
+   - **Retained failure logs, upstream Rust visibility, and public-spelling verification:**
+     1. **Step `1878` & Step `1874` ([`steps/1874/output.txt`](file:///Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/1874/output.txt), `SHA256: e197fb6d905f6d523b6d18145c57fa9ad519f200d5566aa04c61c565c0f8d22c`):** Generated `V8.kt:12310-12315` emitted `val _result = run { __self.null() }`, failing `compileSwiftExportMainKotlinMacosArm64` at `V8.kt:12313:19` (`Cannot infer type for type parameter 'R'`) and `V8.kt:12313:32` (`Reference has a nullable type 'Nothing?'` / `No receiver can be passed to this function or property`). `Isolate.kt:83,85` (`` internal fun `null`() `` + `public fun nullValue()`) and `Function.kt:127,129, 179,181` (`` internal fun `this`() `` + `public fun thisValue()`) preserve the public operations via a **qualified project-specific public spelling migration** (`nullValue()` / `thisValue()`); this is a source workaround for unescaped keyword emission, **not** a generator fix or blanket API-hiding license.
+     2. **Step `1904` ([`steps/1904/output.txt`](file:///Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/1904/output.txt), `SHA256: 4eba8703b0e74c84a6b899d252aa2a2d6e05b3fbb722c9b0ed1334bf8767ceaf`):** `linkSwiftExportBinaryDebugStaticMacosArm64` failed with `Global 'ktypew:kotlin.collections.MutableSet' already exists`, caused by `KotlinStdlib.kt:20` (`@file:BindClassToObjCName(kotlin.collections.MutableSet::class, ...)`) plus reverse `MutableMap.entries`/`keys` bridges at `KotlinStdlib.kt:341, 351`. `src/common/commonMain` (`internal val slots: MutableMap<String, Any> = mutableMapOf()`) on `class IsolateAnnex internal constructor(...)` corresponds to upstream Rust `tmp/v8/src/isolate.rs:1899` (`pub(crate) struct IsolateAnnex`) and its private field `slots: HashMap<TypeId, RawSlot, BuildTypeIdHasher>` at line `1901`. Making `slots` `internal` is faithful crate-private visibility alignment, **not** hiding a public upstream API.
+     3. The Syn producer owner received the exact regression evidence and recorded both the `ktypew:kotlin.collections.MutableSet` duplicate-global symbol and backticked-keyword escaping into [`kotlin-swift-export-tooling/verification/UPSTREAM_ISSUES.md`](file:///Volumes/stuff/Projects/kotlinmania/kotlin-swift-export-tooling/verification/UPSTREAM_ISSUES.md) (local documentation only; no external upstream bug report was filed).
+   - **Effective compiler/mode/warning audit (`description.json` SHA256 `8928e61883026d1a103582e9c599ba389f804abd5a1f077bea29b814da4c0d92`):**
+     - No verbose `swift-frontend` command lines were captured in Step `1942`. Retained `.build/arm64-apple-macosx/debug/description.json` under Apple Swift `6.3.3` establishes that generated dependency modules compiled in **Swift 5** language mode, authored `SwiftTestHarnessTests` compiled in **Swift 6** language mode, the generated `SwiftTestHarnessPackageTests` runner compiled with no explicit language-version flag, and **ALL Swift targets compiled WITHOUT `-warnings-as-errors`**.
+     - `v8-kotlin/build.gradle.kts:370-374` disables `allWarningsAsErrors` on `compileSwiftExportMain*` tasks (`generated Kotlin Werror = false`); line `1389` rewrites `swift-tools-version: 6.0` $\to$ `5.9`; and line `1474` invokes plain `swift test` without `-Xswiftc -warnings-as-errors`.
+   - **Retained test execution counts (`08:52–08:53Z` XML reports + Step `1942` Swift output):**
+     - **Swift test count ([`steps/1942/output.txt`](file:///Users/sydney/.gemini/antigravity/brain/035cfd35-895c-497a-927a-3af4da50a6b1/.system_generated/steps/1942/output.txt), `SHA256: ee9995f8033abadf5fe5ee135617c0207ed80ec7370a6abab75a114871240228`):** **1 Swift Testing test (`testSwiftModuleLoads`) executed and passed** (`Test run with 1 test in 1 suite passed`, exercising actual `PropertyAttribute`, `PropertyFilter`, `HandlerFlags`, `MicrotasksPolicy`, and `version` operations), despite XCTest's separate `Executed 0 tests` summary.
+     - **KMP XML reports:** `jvmTest` = **`46` passed** (`0` failures/errors/skips), and **10 additional host-runnable tasks** = **`45` passed each** (`0` failures/errors/skips), totaling **11 runnable environments** (`496` XML test executions). Reporting "`17` target builds / `275` tasks" establishes only compilation/link task coverage across 17 configured targets, **NOT** `17` executed target runtimes and **NOT** strict Swift `-warnings-as-errors` acceptance.
+6. **Independently audited `rama-tls-rustls-kotlin` (`main` @ `97e74acfc8ae5c718c5f4c960d6609596778e2b0` / PR #116) non-`-Werror` mixed-mode behavioral pass (`audit.json` SHA256 `de47cb532482613ec859ae3c400a68e0a028e5920d95c67b9330957d0b01a042`):**
+   - **Repository & clean head:** `/Volumes/stuff/Projects/kotlinmania/rama-tls-rustls-kotlin` at clean `main` commit `97e74acfc8ae5c718c5f4c960d6609596778e2b0` (merging `b6b4adb` / PR #116; `git status` clean). Read-only receipt: `automation-artifacts/2026-10-21-rama-tls-rustls-readonly-audit/audit.json` (`SHA256: de47cb532482613ec859ae3c400a68e0a028e5920d95c67b9330957d0b01a042`).
+   - **Actual Gradle daemon & SwiftPM manifest evidence (`daemon-15916.out.log` SHA256 `d80b660f0eb3f881db3ea309580c4e8e3b5b42b63496d7bd6907e538be308a3c`; `.build/arm64-apple-macosx/debug/description.json` SHA256 `7e52d4cf2a53c9a83e526757c585ce341e511dd4a286466b8eb2be9786ef3849`):**
+     - **Dependency frontends (lines `1280–1440`):** **16 frontend invocations across 8 generated dependency modules** (`ExportedKotlinPackages`, `IoGithubKotlinmaniaRamaCoreKotlin`, `IoGithubKotlinmaniaRamaNetKotlin`, `KotlinCoroutineSupport`, `KotlinRuntimeSupport`, `KotlinStdlib`, `OrgJetbrainsKotlinxKotlinxSerializationCore`, `RamaTlsRustls`) compiled in explicit **Swift 5** language mode (`-swift-version 5`) with **NO `-warnings-as-errors`** (`Werror: false`).
+     - **Authored consumer test frontends (lines `1579–1580`):** `SwiftTestHarnessTests` compiled in explicit **Swift 6** language mode (`-swift-version 6`) with **NO `-warnings-as-errors`** (`Werror: false`).
+     - **Generated test-runner frontends (lines `1584–1585`):** `SwiftTestHarnessPackageTests` compiled with **no explicit language-version flag** and **NO `-warnings-as-errors`** (`Werror: false`).
+     - **Executed Swift behavioral tests (lines `1608–1612, 1614`):** **5/5 named Swift tests executed and passed** (`testServerName()`, `testNoServerCertVerifierCompanion()`, `testRamaTlsRustlsCrateMarker()`, `testNoServerCertVerifier()`, `testUnixTime()` $\to$ `Test run with 5 tests in 1 suite passed`). This is a **real 5/5 Swift behavioral pass**, **NOT** an all-module Swift 6 or strict `-warnings-as-errors` pass.
+   - **Build script, header, and toolchain provenance qualifications:**
+     - `rama-tls-rustls-kotlin/build.gradle.kts:338` disables generated Kotlin bridge `-Werror` (`compileSwiftExportMain*` sets `allWarningsAsErrors = false`); the smoke test runs `swift test -v` without `XCODE_XCCONFIG_FILE` or `-Xswiftc -warnings-as-errors`. Although `verification/enforce_swift6.py` and `verification/strict-swift.xcconfig` exist in the repository tree, neither is wired into the build.
+     - Generated `build/SPMPackage/macosArm64/Debug/Package.swift` is `// swift-tools-version: 5.9` (`SHA256: 626933636eefe5dfc7dc8baec96e0b1a07e46b939533f1c0f8bd50319a5b8086`).
+     - Retained `KotlinBase.h` in the build output matches the **stock** Kotlin 2.4.20 header (`SHA256: 14390b9a40bcd8f924909692249ca95468cd3de36157be762371b1673dab86f3`), **not** the repaired ownership header (`99186d1d...`). Stock `swift-export-embeddable-2.4.20.jar` (`24c6159bcf0087ecf86bfc9bad01a975e192abcf75005b248292d85a139c2055`) is present in the local Gradle cache as a candidate only; the exact consumed worker classpath was not pinned by that build.
+   - **Retained KMP XML test reports (`08:07–08:08Z`):**
+     - **19 passing test cases each across 11 runnable environments** (`jvmTest`, `testAndroidHostTest`, `macosArm64Test`, `iosSimulatorArm64Test`, `tvosSimulatorArm64Test`, `watchosSimulatorArm64Test`, `jsNodeTest`, `jsBrowserTest`, `wasmJsNodeTest`, `wasmJsBrowserTest`, `wasmWasiNodeTest`), with `0` failures, `0` errors, and `0` skips (`209` total XML test executions). These are retained local XML reports without a frozen source-input pin manifest, and no 17-runtime or host-foreign execution is claimed.
+7. **Independently audited `tokio-util-kotlin` ([PR #128](https://github.com/KotlinMania/tokio-util-kotlin/pull/128), `main` @ `ea40187bf6268a56a8f2d193cf3e1f48d2e52d67`) pre-Xcode `XCODE_XCCONFIG_FILE` guard failure (`summary.json` SHA256 `689a9f98d7b44560a55ef1c006a5dad729bd60ebab2003d67618289c84d81e4f`):**
+   - **Read-only receipt & ownership:** [`automation-artifacts/2026-10-21-tokio-util-ci-readonly/summary.json`](file:///Volumes/stuff/Projects/kotlinmania/automation-artifacts/2026-10-21-tokio-util-ci-readonly/summary.json) (`SHA256: 689a9f98d7b44560a55ef1c006a5dad729bd60ebab2003d67618289c84d81e4f`), auditing merged [PR #128](https://github.com/KotlinMania/tokio-util-kotlin/pull/128) at `main` / CI head `ea40187bf6268a56a8f2d193cf3e1f48d2e52d67` (implementation head `f4d00e02ad201c5850d3ff5dca9e0147f348c7b8`; existing owner session `47ba7261` notified on Kanban card `t_61edec8d`).
+   - **CI Run `39572583245` / Swift Job `119130174153` (`lines 387–389`):**
+     - Failed the repository's Gradle `doFirst` guard (`Required XCODE_XCCONFIG_FILE missing`) on `macosArm64DebugBuildSPMPackage` **before `xcodebuild` or `swift-frontend` ever launched**; **`0` Swift test cases executed**.
+     - Although the workflow prints `Swift 6.3.3 / Xcode 26.6` and the generated `Package.swift` (`SHA256: db09b82daca448984f659c6c09cfbcd9c3f9fb363b3736b02093a7a5c4628807`) contains rewritten `swift-tools-version: 6.0` / `swiftLanguageModes: [.v6]` declarations, that file is **manifest generation / post-rewrite evidence only** — **not** a `KotlinRuntimeSupport` Swift 6 compilation failure (because Xcode compilation never ran).
+   - **Independently counted runtime test executions (`192` total) & workflow gaps:**
+     - `11` CI XML environments $\times$ `16` passing cases each = **`176` XML cases** (`0` failures/errors/skips) + **`16` Android host log cases** = **`192` verified runtime executions**.
+     - `.github/workflows/ci.yml` invokes `11` of `12` platform workflows and **omits `jvm.yml`**; Android device APK is assembled only; `androidNativeArm64`/`androidNativeX64` are compile-only; no `linuxArm64` runtime execution exists; and Swift executed `0` tests. Retained local iOS/tvOS/watchOS simulator XML reports each record `16` cases across `7` suites (a local screenshot citing "11 classes / 32 assertions" reflects a different metric and is not independently verified; local browser XML dates from Oct 14).
+
+For the standalone, task-oriented technical reference covering all sections with stable anchors and linked table of contents, see [`template/V2_SWIFT.md`](file:///Volumes/stuff/Projects/kotlinmania/template/V2_SWIFT.md).

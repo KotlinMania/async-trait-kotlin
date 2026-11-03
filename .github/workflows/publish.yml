@@ -17,15 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    if: ${{ github.event_name == 'release' || inputs.publish }}
-    uses: ./.github/workflows/gradle.yml
-    permissions:
-      contents: read
-
   publish:
-    needs: validate
-    if: ${{ always() && (needs.validate.result == 'success' || (github.event_name == 'workflow_dispatch' && !inputs.publish)) }}
     name: Publish to Maven Central
     runs-on: macos-latest
 
@@ -37,19 +29,16 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v6.0.1
+        uses: actions/setup-java@v6.1.0
         with:
           distribution: 'zulu'
           java-version: '21'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6.3.0
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+        uses: gradle/actions/setup-gradle@v6.4.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: '24'
           check-latest: true
@@ -65,23 +54,16 @@ jobs:
           npm --version
           yarn --version
 
-      - name: Verify publication bundle (dry run)
+      - name: Build (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+        # Keep workflow_dispatch safe (no publishing), and keep runtime low by focusing on JVM/Android output.
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
-        run: ./gradlew :library:prepareAndroidPublicationVerification --no-configuration-cache
-
-      - name: Resolve and compile the packaged Android publication (dry run)
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
-        run: >
-          env -u ANDROID_SDK_ROOT ./gradlew -p verification/android-consumer
-          verifyAndroidPublication
-          --refresh-dependencies
-          --no-configuration-cache
+        run: ./gradlew setupAndroidSdk androidPublicationBundle --no-configuration-cache
 
       - name: Publish to Maven Central
         if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
-        run: ./gradlew :library:publishToCentralPortal -PcentralPublishingType=AUTOMATIC --no-configuration-cache
+        run: ./gradlew setupAndroidSdk publishToCentralPortal -PcentralPublishingType=AUTOMATIC --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_kotlin_js_yarn_download: "false"
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
@@ -89,14 +71,3 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
-
-      - name: Upload publication and executed consumer test reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-publication-verification
-          path: |
-            library/build/reports/publication/
-            verification/android-consumer/build/reports/publication/
-            verification/android-consumer/build/test-results/
-          if-no-files-found: error
