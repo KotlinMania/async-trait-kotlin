@@ -24,7 +24,7 @@ enum class InferredBound : ToTokens {
 
     override fun toTokens(tokens: TokenStream) {
         val ident = Ident.new(asStr(), Span.callSite())
-        quote("::core::marker::`#`ident", "ident" to ident).toTokens(tokens)
+        tokens.extendTokenStreams(listOf(quote("::core::marker::`#`ident", "ident" to ident)))
     }
 
     override fun toString(): String = asStr()

@@ -28,6 +28,7 @@ import io.github.kotlinmania.syn.TypeParamBoundList
 import io.github.kotlinmania.syn.WhereClause
 import io.github.kotlinmania.syn.WherePredicate
 import io.github.kotlinmania.syn.WherePredicateList
+import io.github.kotlinmania.syn.copy
 import io.github.kotlinmania.syn.gen.Fold
 import io.github.kotlinmania.syn.gen.VisitMut
 import io.github.kotlinmania.syn.parse2
