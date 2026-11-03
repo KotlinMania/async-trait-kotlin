@@ -487,13 +487,12 @@ internal class AssociatedTypeImplTraits(
     var contains: Boolean = false,
 ) : VisitMut() {
     override fun visitTypePath(typePath: SynType.Path) {
-        if (
-            typePath.qself == null &&
-            typePath.path.segments.len() == 2 &&
-            typePath.path.segments[0].ident.toString() == "Self" &&
-            set.contains(typePath.path.segments[1].ident)
-        ) {
-            contains = true
+        val segments = typePath.path.segments
+        if (typePath.qself == null && segments.len() == 2) {
+            val firstIdent = segments[0].ident
+            if (firstIdent.toString() == "Self" && set.contains(segments[1].ident)) {
+                contains = true
+            }
         }
         super.visitTypePath(typePath)
     }

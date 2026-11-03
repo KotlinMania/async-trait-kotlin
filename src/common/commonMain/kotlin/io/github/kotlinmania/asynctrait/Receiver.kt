@@ -71,15 +71,19 @@ internal class HasSelf(
     var value: Boolean,
 ) : VisitMut() {
     override fun visitExprPath(exprPath: Expr.Path) {
-        if (!exprPath.path.segments.isEmpty()) {
-            value = value || exprPath.path.segments[0].ident.toString() == "Self"
+        val segments = exprPath.path.segments
+        if (!segments.isEmpty()) {
+            val firstIdent = segments[0].ident
+            value = value || firstIdent.toString() == "Self"
         }
         super.visitExprPath(exprPath)
     }
 
     override fun visitTypePath(typePath: SynType.Path) {
-        if (!typePath.path.segments.isEmpty()) {
-            value = value || typePath.path.segments[0].ident.toString() == "Self"
+        val segments = typePath.path.segments
+        if (!segments.isEmpty()) {
+            val firstIdent = segments[0].ident
+            value = value || firstIdent.toString() == "Self"
         }
         super.visitTypePath(typePath)
     }
@@ -152,7 +156,8 @@ internal object ReplaceSelf : VisitMut() {
         // expanding to an expression. Otherwise, do not recurse into nested items.
         if (i is Item.Macro) {
             val path = i.mac.path
-            if (path.isIdent("macro_rules") || path.segments.last()?.ident?.toString() == "select") {
+            val lastSeg = path.segments.last()
+            if (path.isIdent("macro_rules") || lastSeg?.ident?.toString() == "select") {
                 visitMacro(i.mac)
             }
         }
