@@ -7,7 +7,6 @@ import io.github.kotlinmania.procmacro2.TokenStream
 import io.github.kotlinmania.procmacro2.TokenTree
 import io.github.kotlinmania.syn.Block
 import io.github.kotlinmania.syn.Expr
-import io.github.kotlinmania.syn.FieldMutability
 import io.github.kotlinmania.syn.FnArg
 import io.github.kotlinmania.syn.Item
 import io.github.kotlinmania.syn.Macro
@@ -59,8 +58,8 @@ internal class HasMutPat(
 ) : VisitMut() {
     override fun visitPatIdent(patIdent: Pat.Ident) {
         val mutability = patIdent.mutability
-        if (mutability is FieldMutability.Mut) {
-            value = Mut.from(mutability.token.span)
+        if (mutability != null) {
+            value = Mut.from(mutability.span)
         } else {
             super.visitPatIdent(patIdent)
         }

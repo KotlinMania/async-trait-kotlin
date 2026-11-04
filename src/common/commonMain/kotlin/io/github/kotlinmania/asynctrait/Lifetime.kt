@@ -6,6 +6,7 @@ import io.github.kotlinmania.syn.Expr
 import io.github.kotlinmania.syn.FnArg
 import io.github.kotlinmania.syn.GenericArgument
 import io.github.kotlinmania.syn.Lifetime
+import io.github.kotlinmania.syn.ReceiverKind
 import io.github.kotlinmania.syn.ReturnType
 import io.github.kotlinmania.syn.SynType
 import io.github.kotlinmania.syn.TypeParamBound
@@ -45,11 +46,14 @@ internal class CollectLifetimes(
     }
 
     override fun visitReceiver(receiver: FnArg.Receiver) {
-        val ref = receiver.reference
-        if (ref == null) {
-            visitType(receiver.type)
-        } else {
-            ref.lifetime = visitOptLifetime(ref.andToken, ref.lifetime)
+        when (val kind = receiver.kind) {
+            ReceiverKind.Value -> Unit
+            is ReceiverKind.Reference -> {
+                kind.lifetime = visitOptLifetime(kind.andToken, kind.lifetime)
+            }
+            is ReceiverKind.Typed -> {
+                visitType(kind.ty)
+            }
         }
     }
 
@@ -94,12 +98,12 @@ internal object AddLifetimeToImplTrait : VisitMut() {
         super.visitTypePtr(ty)
     }
 
-    override fun visitTypeBareFn(ty: SynType.BareFn) {
+    override fun visitTypeFnPtr(ty: SynType.FnPtr) {
         val output = ty.output
         if (output is ReturnType.TypeReturn) {
             parenthesizeImplTrait(output.ty, output.arrowToken.spans[0]) { output.ty = it }
         }
-        super.visitTypeBareFn(ty)
+        super.visitTypeFnPtr(ty)
     }
 
     override fun visitExpr(e: Expr): Expr =

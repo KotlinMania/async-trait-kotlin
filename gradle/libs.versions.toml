@@ -12,9 +12,10 @@ kotlinxBenchmark = "0.5.0"
 procMacro = "0.1.5"
 procMacro2 = "0.1.8"
 quote = "0.3.1"
-syn = "0.4.1"
-futures = "0.2.1"
+syn = "0.5.0"
+futures = "0.3.0"
 tracing = "0.1.0"
+androidxTestRunner = "1.7.0"
 
 [plugins]
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidKmp" }
@@ -39,6 +40,7 @@ quote-kotlin = { module = "io.github.kotlinmania:quote-kotlin", version.ref = "q
 syn-kotlin = { module = "io.github.kotlinmania:syn-kotlin", version.ref = "syn" }
 futures-kotlin = { module = "io.github.kotlinmania:futures-kotlin", version.ref = "futures" }
 tracing-kotlin = { module = "io.github.kotlinmania:tracing-kotlin", version.ref = "tracing" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 
 [bundles]
 asynctrait-commonMainApi = [

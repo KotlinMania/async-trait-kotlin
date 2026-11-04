@@ -171,6 +171,95 @@ For diagnostic APIs, follow
 [the concrete SynError repair and verification rules](#diagnostic-apis-repair-the-exported-types-not-their-aliases)
 below. A new name alone does not remove inherited or erased Kotlin APIs.
 
+### Serde case: dependency reachability and generic receiver warnings (2026-11-03)
+
+The Serde QA pass separates a corrected export surface from an unresolved
+bridge-generation problem. Apply the dependency and API checks below before
+copying a remedy from another project. The crate source in `tmp/` establishes
+the port's operations and visibility; Kotlin release numbers are independent
+of Rust crate versions.
+
+1. **Export dependencies that occur in the public contract.** Serde's public
+   derive entry points return ProcMacro2 `TokenStream`, so ProcMacro2 belongs
+   on its `commonMain` API dependency edge and in its explicit Swift exports.
+   Syn and Quote remain implementation dependencies: the inspected
+   `serde_derive` module declarations do not publicly reexport their helpers.
+   Keeping those helpers internal and removing the unnecessary Syn/Quote
+   Swift export requests eliminated Serde's generated
+   `removedDueToConflicts` references. That identifier comes from the
+   exporter's `ModuleTranslationKt`; it is not a Rust API to implement with
+   an alias, invented type or stub. This fixes Serde's dependency exposure;
+   it does not establish acceptance of Syn's own generated bindings.
+
+2. **Audit the whole Rust export chain and existing Kotlin callers.** A
+   `priv` package or `mod private` declaration alone does not prove an item
+   is crate-private. `serde_core/build.rs` generates a hidden public
+   `__private$$` module that reexports `crate::private::*`, including
+   `size_hint`. Preserve those operations and the existing layout/FFI
+   evidence. Before narrowing implementation visibility, check public
+   signatures, inherited members and workspace callers. In this pass,
+   Serde's public derive operations and the `RenameRule` API used by
+   rust-kotlin were retained.
+
+3. **Check individual warning controls as well as `-Werror`.** An inherited
+   `compileSwiftExportMain*` configuration added
+   `-Xwarning-level=UNCHECKED_CAST:disabled`. Remove that override: setting
+   `allWarningsAsErrors=true` while disabling the relevant warning is not
+   strict bridge validation. Do not replace it with generated-file edits,
+   suppressions or hidden public declarations. At this audit the override
+   still exists in `template/build.gradle.kts`; it was removed from Serde
+   only. That shared template-code mismatch remains outstanding.
+   Ren's historical Syn card
+   `t_d1e1e172` used `List` constructor inputs with private mutable backing;
+   that is evidence for that specific repair, not permission to remove
+   another API's mutation or alias-identity semantics.
+
+4. **Preserve genuine generic operations when classifying the remainder.**
+   With Kotlin `2.4.21` and exporter `2.4.20-km.4` (worker SHA256
+   `4240be980f3a94bbb250bcf34d73a9b9585d73296edf09fe42bdf494377b0310`),
+   Serde still emitted 241 unchecked casts: 220 in `Serde.kt` and 21 in
+   `KotlinStdlib.kt`. The selected `AsObject` and `AsExistential` receiver
+   renderers are byte-identical to the official exporter and reconstruct
+   parameterized types from opaque handles. `Serializer`, `Visitor`,
+   collection serialization traits and value deserializers are public in
+   `tmp/`; hiding them is not a repair. The additional deprecated-call
+   warning invokes the genuinely exported, deprecated
+   `serde_if_integer128` operation. Do not delete that operation or its
+   deprecation metadata. Concrete outcomes help known-result boundaries,
+   but do not prove that retained generic protocols are correctly bridged.
+   Follow [the compatibility and typed-operation rules](V2_SWIFT.md#kotlin-vs-swift-defect-taxonomy)
+   before any specialization or signature migration; independent
+   `Any`/star captures do not preserve shared input and mutation contracts.
+
+5. **Reuse the existing producer and consumer evidence.** On the KotlinMania
+   board accessed through Hermes's Ren profile, `t_6c4d8c88` already tracks
+   the related generic receiver/constructor family; comment 1981 includes
+   the unconstrained Rama HTTP Backend receiver case. `t_e564f14a` records
+   the related OnceCell typed-operation problem. Keep Serde's case with
+   that existing producer ownership instead of starting another writer.
+   `t_ff493625` is the existing Serde dependency/release tracker, while
+   `t_9586d46a` and the runtime/header cards cover separate failures.
+   Historical card completion, a classpath repair, or fixture passes do
+   not establish current Serde acceptance or authorize publication.
+
+**Verified scope:** the corrected Serde working tree (base HEAD
+`5f22fd414043522d0097fae3908b6c655f3001fc` plus the retained uncommitted
+fixes) passed Detekt, ktlint and 4,798 host test executions across 11 test
+tasks, with zero failures, errors or skips. The complete build exited 1 at
+`compileSwiftExportMainKotlinMacosArm64`, surfaced by
+`swiftExportSmokeTest`. Swift behavioral execution remained zero; Release
+Swift acceptance, new local Maven artifacts and artifact-consumer validation
+were not run. Do not describe the full build or Swift contract as passing.
+No remote publication or CI dispatch was performed by this QA pass.
+
+Local evidence is retained in the QA task directory
+`/Users/sydney/Documents/Codex/2026-11-03/task-7`:
+`template-upgrade-serde-kotlin-build-05-execution.json`,
+`retained-serde-source-fixes-20261104/build-05/manifest.json`,
+`serde-swift-followup-20261104/diagnosis.json`, and
+`serde-swift-kanban-review-20261104.json`. The receipts distinguish source
+checks, actual runtime counts, failed generated bridges and unrun stages.
+
 ---
 
 ## Preconditions to verify before acting

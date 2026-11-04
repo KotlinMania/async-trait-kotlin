@@ -78,11 +78,15 @@ struct AsyncTraitTests {
         #expect(message.contains("expected"))
         #expect(result.value == nil)
 
+        let expansionArgs = try #require(
+            ExportedKotlinPackages.io.github.kotlinmania.procmacro2.TokenStream.Companion.shared
+                .fromString(src: "?Sync").value
+        )
         let source = try #require(
             ExportedKotlinPackages.io.github.kotlinmania.procmacro2.TokenStream.Companion.shared
                 .fromString(src: "trait Trait {}").value
         )
-        let expansion = asyncTrait(args: tokens, input: source)
+        let expansion = asyncTrait(args: expansionArgs, input: source)
         let expansionDiagnostic = try #require(expansion.error)
         let expansionMessage: String = expansionDiagnostic.message
         #expect(expansionMessage.contains("expected"))

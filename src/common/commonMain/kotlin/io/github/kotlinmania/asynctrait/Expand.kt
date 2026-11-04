@@ -8,7 +8,6 @@ import io.github.kotlinmania.quote.quote
 import io.github.kotlinmania.quote.quoteSpanned
 import io.github.kotlinmania.syn.Attribute
 import io.github.kotlinmania.syn.Block
-import io.github.kotlinmania.syn.FieldMutability
 import io.github.kotlinmania.syn.FnArg
 import io.github.kotlinmania.syn.GenericArgument
 import io.github.kotlinmania.syn.GenericParam
@@ -18,6 +17,7 @@ import io.github.kotlinmania.syn.Lifetime
 import io.github.kotlinmania.syn.LifetimeList
 import io.github.kotlinmania.syn.Pat
 import io.github.kotlinmania.syn.PathArguments
+import io.github.kotlinmania.syn.ReceiverKind
 import io.github.kotlinmania.syn.ReturnType
 import io.github.kotlinmania.syn.Signature
 import io.github.kotlinmania.syn.SynResult
@@ -270,17 +270,7 @@ internal fun transformSig(
             if (isLocal) {
                 emptyList()
             } else {
-                val receiverType = extractReceiverType(sig)
-                when {
-                    receiverType == null -> listOf(InferredBound.Send)
-                    // Shared reference receiver: &Self
-                    receiverType is SynType.Reference && receiverType.mutability == null ->
-                        listOf(InferredBound.Sync)
-                    // Reference-counted shared receiver: Arc<Self>
-                    receiverType is SynType.Path && isArcSelf(receiverType) ->
-                        listOf(InferredBound.Sync, InferredBound.Send)
-                    else -> listOf(InferredBound.Send)
-                }
+                inferredBoundsForReceiver(sig)
             }
 
         val filteredBounds =
@@ -310,7 +300,7 @@ internal fun transformSig(
     for ((i, arg) in sig.inputs.withIndex()) {
         when (arg) {
             is FnArg.Receiver -> {
-                if (arg.reference == null) {
+                if (arg.kind !is ReceiverKind.Reference) {
                     arg.mutability = null
                 }
             }
@@ -319,7 +309,7 @@ internal fun transformSig(
                     val pat = arg.patType.pat
                     if (pat is Pat.Ident) {
                         pat.byRef = null
-                        pat.mutability = FieldMutability.None
+                        pat.mutability = null
                     } else {
                         val positional = positionalArg(i, pat)
                         val m = mutPat(pat)
@@ -449,18 +439,39 @@ internal fun transformBlock(
     block.stmts = parseQuoteStmtList(boxPin)
 }
 
-private fun extractReceiverType(sig: Signature): SynType? =
+private fun inferredBoundsForReceiver(sig: Signature): List<InferredBound> =
     when (val first = sig.inputs.firstOrNull()) {
-        is FnArg.Receiver -> first.type
+        is FnArg.Receiver ->
+            when (val kind = first.kind) {
+                ReceiverKind.Value -> listOf(InferredBound.Send)
+                is ReceiverKind.Reference ->
+                    if (kind.mutability == null) {
+                        listOf(InferredBound.Sync)
+                    } else {
+                        listOf(InferredBound.Send)
+                    }
+                is ReceiverKind.Typed -> inferredBoundsForReceiverType(kind.ty)
+            }
         is FnArg.Typed -> {
             val pat = first.patType.pat
             if (pat is Pat.Ident && pat.ident.toString() == "self") {
-                first.patType.ty
+                inferredBoundsForReceiverType(first.patType.ty)
             } else {
-                null
+                listOf(InferredBound.Send)
             }
         }
-        else -> null
+        else -> listOf(InferredBound.Send)
+    }
+
+private fun inferredBoundsForReceiverType(receiverType: SynType): List<InferredBound> =
+    when {
+        // Shared reference receiver.
+        receiverType is SynType.Reference && receiverType.mutability == null ->
+            listOf(InferredBound.Sync)
+        // Shared reference-counted receiver.
+        receiverType is SynType.Path && isArcSelf(receiverType) ->
+            listOf(InferredBound.Sync, InferredBound.Send)
+        else -> listOf(InferredBound.Send)
     }
 
 private fun isArcSelf(ty: SynType.Path): Boolean {
