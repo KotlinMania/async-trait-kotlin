@@ -82,7 +82,7 @@ import io.github.kotlinmania.syn.toTokenStreamParseResult
  * ```kotlin
  * @asyncTrait
  * interface Test {
- *     public fun test(elided: Elided) {}
+ *     public fun test(elided: Elided)
  * }
  * ```
  *
